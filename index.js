@@ -2,6 +2,7 @@ const mongoose = require("mongoose"); // Require mongoose library
 const userService = require("./services/userService");
 const express = require("express");
 var app = express();
+
 require("dotenv").config(); // Require the dotenv
 
 mongoose
@@ -19,9 +20,8 @@ mongoose
   });
 
 const PORT = process.env.PORT || 5000;
-
+app.use(express.json());
 app.use("/user", userService);
-
 app.listen(PORT, () => {
   console.log("Server started listening on port : ", PORT);
 });
