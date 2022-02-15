@@ -4,19 +4,30 @@ const userModel = require("./../model/user");
 const userService = express();
 userService.use(express.json());
 
-router.get("/allUsers", async (req, res) => {
-  userModel.find(function (err, data) {
+const emailService = require("./emailService");
+
+router.get("/login", async (req, res) => {
+  userModel.find({ email: req.query.email }, function (err, data) {
     if (err) {
       console.log(err);
     } else {
-      res.send(data);
+      if (req.query.password === data.password) res.send(data);
+      else res.send("login Failed");
     }
   });
 });
 
-router.post("/save", async (req, res) => {
+router.get("/sendOtp", async (req, res) => {
+  emailService.sendEmail(req.query.email);
+  res.send("Otp Sent");
+});
+
+router.get("/validateOtp", async (req, res) => {
+  res.send(emailService.validateOtp(req.query.email, req.query.otp));
+});
+
+router.post("/register", async (req, res) => {
   var newStudent = new userModel(req.body);
-  console.log(newStudent);
   const data = await newStudent.save(function (err, data) {
     if (err) {
       console.log(error);

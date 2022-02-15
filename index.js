@@ -22,6 +22,7 @@ mongoose
 const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use("/user", userService);
+
 app.listen(PORT, () => {
   console.log("Server started listening on port : ", PORT);
 });
