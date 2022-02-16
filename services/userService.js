@@ -71,21 +71,23 @@ router.post("/register", async (req, res) => {
 });
 
 router.put("/update", async function (req, res) {
-  const user = await userModel.findByIdAndUpdate(req.body._id, req.body);
-  if (user != null) {
-    user.password = null;
-    return res.json({
-      status: "success",
-      result: user,
-      message: "user saved successfully",
+  await userModel
+    .findByIdAndUpdate(req.body._id, req.body, { new: true })
+    .exec()
+    .then((data) => {
+      res.json({
+        status: "success",
+        result: data,
+        message: "user saved successfully",
+      });
+    })
+    .catch((err) => {
+      res.status(400).json({
+        status: "Failure",
+        result: "",
+        message: "user not updated",
+      });
     });
-  } else {
-    return res.json({
-      status: "Failure",
-      result: "",
-      message: "user not updated",
-    });
-  }
 });
 
 module.exports = router;
