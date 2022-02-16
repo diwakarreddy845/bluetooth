@@ -24,7 +24,7 @@ module.exports.sendEmail = function (toEmail) {
     text:
       "Dear Sir / Madam, \r\nYour One Time Password(OTP) is :" +
       this.generateOtp(toEmail) +
-      "\r\nYour OTP will expire in 5 min. \r\nDo not share your OTP with anyone including your Depository Participant (DP).",
+      "\r\nYour OTP will expire in 5 min. \r\n\r\n\r\n\r\n\r\nDo not share your OTP with anyone including your Depository Participant (DP).",
   };
 
   transporter.sendMail(mailOptions, function (error, info) {

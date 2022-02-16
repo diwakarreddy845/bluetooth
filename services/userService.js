@@ -12,17 +12,13 @@ const response = {
   message: "",
 };
 
-router.get("/login", async (req, res) => {
+router.post("/login", async (req, res) => {
   const user = await userModel
-    .findOne({ email: req.query.email, password: req.query.password })
+    .findOne({ email: req.body.email, password: req.body.password })
     .exec();
   if (user != null) {
     user.password = null;
-    return res.json({
-      status: "success",
-      result: user,
-      message: "",
-    });
+    return res.json({ status: "success", result: user, message: "" });
   } else {
     return res.json({
       status: "failure",
@@ -74,23 +70,22 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.put("/update", function (req, res) {
-  userModel.findByIdAndUpdate(req.body._id, req.body, function (err, data) {
-    if (err) {
-      console.log(error);
-    } else {
-      res.send(data);
-    }
-  });
-});
-
-router.get("/forgotPassword", async (req, res) => {
-  emailService.sendEmail(req.query.email);
-  return res.json({
-    status: "success",
-    result: null,
-    message: "Otp Sent",
-  });
+router.put("/update", async function (req, res) {
+  const user = await userModel.findByIdAndUpdate(req.body._id, req.body);
+  if (user != null) {
+    user.password = null;
+    return res.json({
+      status: "success",
+      result: user,
+      message: "user saved successfully",
+    });
+  } else {
+    return res.json({
+      status: "Failure",
+      result: "",
+      message: "user not updated",
+    });
+  }
 });
 
 module.exports = router;

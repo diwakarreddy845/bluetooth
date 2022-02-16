@@ -15,6 +15,7 @@
     "dotenv": "^16.0.0",
     "express": "^4.17.2",
     "express-session": "^1.17.2",
+    "hex-to-binary": "^1.0.1",
     "mongoose": "^6.2.1",
     "nodemailer": "^6.7.2",
     "speakeasy": "^2.0.0"

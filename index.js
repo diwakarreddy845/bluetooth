@@ -1,5 +1,6 @@
 const mongoose = require("mongoose"); // Require mongoose library
 const userService = require("./services/userService");
+const userDeviceService = require("./services/userDeviceService");
 const express = require("express");
 var app = express();
 
@@ -22,6 +23,7 @@ mongoose
 const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use("/user", userService);
+app.use("/device", userDeviceService);
 
 app.listen(PORT, () => {
   console.log("Server started listening on port : ", PORT);
