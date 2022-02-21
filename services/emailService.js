@@ -63,6 +63,7 @@ module.exports.verifyOtp = function (token) {
 module.exports.validateOtp = function (email, otp) {
   let expiry = this.verifyOtp(otp);
   if (map.get(email) === otp) {
-    return true;
+      map.delete(email);
+      return true;
   } else return false;
 };

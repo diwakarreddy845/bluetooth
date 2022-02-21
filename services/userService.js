@@ -37,6 +37,38 @@ router.get("/sendOtp", async (req, res) => {
   });
 });
 
+router.get("/getUserByEmail", async (req, res) => {
+  const user = await userModel.findOne({ email: req.query.email }).exec();
+  if (user != null) {
+    user.password = null;
+    return res.json({ status: "success", result: user, message: "" });
+  } else {
+    return res.json({
+      status: "failure",
+      result: null,
+      message: "No User found with credentials",
+    });
+  }
+});
+
+router.get("/forgotPassword", async (req, res) => {
+  const user = await userModel.findOne({ email: req.query.email }).exec();
+  if (user != null) {
+    emailService.sendEmail(req.query.email);
+    return res.json({
+      status: "success",
+      result: user,
+      message: "Otp Sent successfully",
+    });
+  } else {
+    return res.json({
+      status: "failure",
+      result: null,
+      message: "Please enter registered email address",
+    });
+  }
+});
+
 router.get("/validateOtp", async (req, res) => {
   const validate = emailService.validateOtp(req.query.email, req.query.otp);
   return res.json({
@@ -86,6 +118,58 @@ router.put("/update", async function (req, res) {
         status: "Failure",
         result: "",
         message: "user not updated",
+      });
+    });
+});
+
+router.put("/updatePassword", async function (req, res) {
+  await userModel
+    .findByIdAndUpdate(
+      { email: req.body.email },
+      { $set: { password: req.body.password } },
+      { new: true }
+    )
+    .exec()
+    .then((data) => {
+      const user = data;
+      user.password = null;
+      res.json({
+        status: "success",
+        result: user,
+        message: "user saved successfully",
+      });
+    })
+    .catch((err) => {
+      res.status(400).json({
+        status: "Failure",
+        result: "",
+        message: "user not updated",
+      });
+    });
+});
+
+router.put("/changePassword", async function (req, res) {
+  await userModel
+    .findOneAndUpdate(
+      { $and: [{ email: req.body.email }, { password: req.body.password }] },
+      { $set: { password: req.body.newPassword } },
+      { new: true }
+    )
+    .exec()
+    .then((data) => {
+      const user = data;
+      user.password = null;
+      res.json({
+        status: "success",
+        result: user,
+        message: "user saved successfully",
+      });
+    })
+    .catch((err) => {
+      res.status(400).json({
+        status: "Failure",
+        result: "",
+        message: "user not found",
       });
     });
 });

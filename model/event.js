@@ -4,7 +4,10 @@ const Schema = mongoose.Schema;
 
 let event = new Schema(
   {
+    eventType: String,
+    subData: Number,
     startDateTime: Date,
+    endDateTime: Date,
     isDeleted: Boolean,
   },
   { collection: "event" }
