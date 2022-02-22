@@ -2,6 +2,8 @@ const mongoose = require("mongoose"); // Require mongoose library
 const userService = require("./services/userService");
 const userDeviceService = require("./services/userDeviceService");
 const eventService = require("./services/eventService");
+const jwt = require("jsonwebtoken");
+
 const express = require("express");
 var app = express();
 

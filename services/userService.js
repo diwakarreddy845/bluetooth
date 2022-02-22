@@ -80,20 +80,19 @@ router.get("/validateOtp", async (req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-  var newUser = new userModel(req.body);
   const user = await userModel.findOne({ email: req.body.email }).exec();
   if (user == null) {
-    await newUser.save(function (err, data) {
-      if (err) {
-        console.log(error);
-      }
-    });
-    newUser.password = null;
-    return res.json({
-      status: "success",
-      result: newUser,
-      message: "user saved successfully",
-    });
+    await userModel
+      .create(req.body)
+      .then((result) => {
+        result.password = null;
+        res.status(200).json({
+          status: "success",
+          result: result,
+          message: "Device added successfully",
+        });
+      })
+      .catch((error) => res.status(500).json({ msg: error }));
   } else {
     return res.json({
       status: "failure",
