@@ -55,6 +55,7 @@ router.get("/forgotPassword", async (req, res) => {
   const user = await userModel.findOne({ email: req.query.email }).exec();
   if (user != null) {
     emailService.sendEmail(req.query.email);
+    user.password = null;
     return res.json({
       status: "success",
       result: user,
@@ -95,7 +96,7 @@ router.post("/register", async (req, res) => {
     });
   } else {
     return res.json({
-      status: "Failure",
+      status: "failure",
       result: "",
       message: "user already exist",
     });
@@ -115,7 +116,7 @@ router.put("/update", async function (req, res) {
     })
     .catch((err) => {
       res.status(400).json({
-        status: "Failure",
+        status: "failure",
         result: "",
         message: "user not updated",
       });
@@ -124,7 +125,7 @@ router.put("/update", async function (req, res) {
 
 router.put("/updatePassword", async function (req, res) {
   await userModel
-    .findByIdAndUpdate(
+    .findOneAndUpdate(
       { email: req.body.email },
       { $set: { password: req.body.password } },
       { new: true }
@@ -141,7 +142,7 @@ router.put("/updatePassword", async function (req, res) {
     })
     .catch((err) => {
       res.status(400).json({
-        status: "Failure",
+        status: "failure",
         result: "",
         message: "user not updated",
       });
@@ -167,7 +168,7 @@ router.put("/changePassword", async function (req, res) {
     })
     .catch((err) => {
       res.status(400).json({
-        status: "Failure",
+        status: "failure",
         result: "",
         message: "user not found",
       });

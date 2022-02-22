@@ -6,9 +6,10 @@ let event = new Schema(
   {
     eventType: String,
     subData: Number,
-    startDateTime: Date,
-    endDateTime: Date,
+    eventDateTime: Date,
     isDeleted: Boolean,
+    email: String,
+    deviceId: String,
   },
   { collection: "event" }
 );

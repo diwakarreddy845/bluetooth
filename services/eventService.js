@@ -11,6 +11,7 @@ router.post("/save", async (req, res) => {
   device = device.replace(/\s/g, "");
   device = device.replace(/,/g, "");
   const event = dateConversion(device);
+  res.json(event);
 });
 
 dateConversion = function (hexString) {
@@ -46,26 +47,29 @@ dateConversion = function (hexString) {
     let minutesN = parseInt(minutes.replace(/\b0+/g, ""), 2).toString(10);
 
     let typeN = parseInt(type.replace(/\b0+/g, ""), 2).toString(10);
-
+    console.log(decimal3);
     let presssureDate = parseInt(decimal3.replace(/\b0+/g, ""), 2).toString(10);
     console.log(yearN, monthN - 1, dateN, hourN, minutesN, 0);
-    let dateTime = new Date(yearN, monthN - 1, dateN, hourN, minutesN, 0);
+    var dateTime = new Date(yearN, monthN - 1, dateN, hourN, minutesN, 0);
+    console.log(dateTime);
     let event = {
-      startDate: dateTime,
+      eventDateTime: dateTime,
       eventType: typeN,
       subData: presssureDate,
     };
 
     var newEvent = new eventModel(event);
-    newEvent.save(function (err, data) {
+    let error = newEvent.save(function (err, data) {
       if (err) {
-        return res.json({
+        console.log(err);
+        return {
           status: "Failure",
           result: "",
           message: "event saving failed",
-        });
+        };
       }
     });
+    if (error) return error;
   }
 };
 
