@@ -89,7 +89,7 @@ router.post("/register", async (req, res) => {
         res.status(200).json({
           status: "success",
           result: result,
-          message: "Device added successfully",
+          message: "Registration successful",
         });
       })
       .catch((error) => res.status(500).json({ msg: error }));
