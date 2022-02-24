@@ -18,7 +18,11 @@ router.post("/login", async (req, res) => {
     .exec();
   if (user != null) {
     user.password = null;
-    return res.json({ status: "success", result: user, message: "" });
+    return res.json({
+      status: "success",
+      result: user,
+      message: "Login Successful",
+    });
   } else {
     return res.json({
       status: "failure",
@@ -33,7 +37,7 @@ router.get("/sendOtp", async (req, res) => {
   return res.json({
     status: "success",
     result: null,
-    message: "Otp Sent",
+    message: "Otp has been generated successfully",
   });
 });
 
@@ -59,7 +63,7 @@ router.get("/forgotPassword", async (req, res) => {
     return res.json({
       status: "success",
       result: user,
-      message: "Otp Sent successfully",
+      message: "Otp has been generated successfully.",
     });
   } else {
     return res.json({
@@ -75,7 +79,7 @@ router.get("/validateOtp", async (req, res) => {
   return res.json({
     status: "success",
     result: validate,
-    message: "",
+    message: "Otp verified successfully",
   });
 });
 
@@ -110,7 +114,7 @@ router.put("/update", async function (req, res) {
       res.json({
         status: "success",
         result: data,
-        message: "user saved successfully",
+        message: "You've successfully updated your details",
       });
     })
     .catch((err) => {
@@ -136,7 +140,7 @@ router.put("/updatePassword", async function (req, res) {
       res.json({
         status: "success",
         result: user,
-        message: "user saved successfully",
+        message: "You've successfully updated your password",
       });
     })
     .catch((err) => {
@@ -162,7 +166,7 @@ router.put("/changePassword", async function (req, res) {
       res.json({
         status: "success",
         result: user,
-        message: "user saved successfully",
+        message: "Your password has been changed successfully",
       });
     })
     .catch((err) => {

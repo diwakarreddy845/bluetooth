@@ -14,7 +14,7 @@ router.post("/save", async (req, res) => {
         res.status(200).json({
           status: "success",
           result: result,
-          message: "Device added successfully",
+          message: "You've successfully paired your device",
         })
       )
       .catch((error) => res.status(500).json({ msg: error }));
@@ -53,7 +53,7 @@ router.delete("/delete", async (req, res) => {
     return res.json({
       status: "success",
       result: device,
-      message: "Deleted successfully",
+      message: "You've successfully unpaired  your device",
     });
   } else {
     return res.json({
