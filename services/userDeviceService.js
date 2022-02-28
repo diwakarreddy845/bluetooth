@@ -6,7 +6,9 @@ const userDeviceService = express();
 userDeviceService.use(express.json());
 
 router.post("/save", async (req, res) => {
-  const user = await userDeviceModel.findOne({ email: req.body.email }).exec();
+  const user = await userDeviceModel
+    .findOne({ deviceId: req.body.deviceId })
+    .exec();
   if (user == null) {
     userDeviceModel
       .create(req.body)
