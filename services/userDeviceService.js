@@ -1,17 +1,13 @@
 const express = require("express");
 const router = require("express").Router();
-const userDeviceModel = require("./../model/userDevice");
-const userDeviceService = express();
-
-userDeviceService.use(express.json());
+const UserDevice = require("./../model/userDevice");
 
 router.post("/save", async (req, res) => {
-  const user = await userDeviceModel
-    .findOne({ deviceId: req.body.deviceId })
-    .exec();
+  const user = await UserDevice.findOne({
+    $or: [{ deviceId: req.body.deviceId }, { email: req.body.email }],
+  }).exec();
   if (user == null) {
-    userDeviceModel
-      .create(req.body)
+    UserDevice.create(req.body)
       .then((result) =>
         res.status(200).json({
           status: "success",
@@ -30,7 +26,7 @@ router.post("/save", async (req, res) => {
 });
 
 router.get("/getDeviceByEmail", async (req, res) => {
-  const device = await userDeviceModel.find({ email: req.query.email });
+  const device = await UserDevice.findOne({ email: req.query.email });
   if (device != null && device.length > 0) {
     res.json({
       status: "success",
@@ -47,21 +43,21 @@ router.get("/getDeviceByEmail", async (req, res) => {
 });
 
 router.delete("/delete", async (req, res) => {
-  const device = await userDeviceModel.findOneAndDelete({
+  const deviceExists = await UserDevice.findOneAndDelete({
     email: req.query.email,
   });
 
-  if (device != null) {
-    return res.json({
-      status: "success",
-      result: device,
-      message: "You've successfully unpaired  your device",
-    });
-  } else {
+  if (deviceExists) {
     return res.json({
       status: "failure",
       result: null,
       message: "No Device found",
+    });
+  } else {
+    return res.json({
+      status: "success",
+      result: device,
+      message: "You've successfully unpaired  your device",
     });
   }
 });
