@@ -1,6 +1,6 @@
 const express = require("express");
 const router = require("express").Router();
-const eventModel = require("./../model/event");
+const Event = require("./../model/event");
 const eventService = express();
 var hexToBinary = require("hex-to-binary");
 
@@ -55,8 +55,7 @@ dateConversion = function (hexString, email, deviceId) {
 
     var dateTime = new Date(yearN, monthN - 1, dateN, hourN, minutesN, 0);
 
-    console.log(dateTime);
-    let event = {
+    let body = {
       eventDateTime: dateTime,
       eventType: typeN,
       subData: presssureDate,
@@ -64,17 +63,14 @@ dateConversion = function (hexString, email, deviceId) {
       deviceId: deviceId,
     };
 
-    var newEvent = new eventModel(event);
-    let error = newEvent.save(function (err, data) {
-      if (err) {
-        console.log(err);
-        return {
-          status: "Failure",
-          result: "",
-          message: "event saving failed",
-        };
-      }
-    });
+    let error = Event.create(body).catch((error) =>
+      res.status(500).json({
+        status: "Failure",
+        result: "",
+        message: "event saving failed",
+      })
+    );
+
     if (error) return error;
   }
 };

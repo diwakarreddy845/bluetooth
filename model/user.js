@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 
-let user = new Schema(
+let userSchema = new Schema(
   {
     firstName: String,
     lastName: String,
@@ -16,7 +16,6 @@ let user = new Schema(
     password: String,
     isDeleted: Boolean,
   },
-  { collection: "user" }
+  { timestamps: true }
 );
-user.set("timestamps", true);
-module.exports = mongoose.model("user", user);
+module.exports = mongoose.model("User", userSchema);

@@ -1,21 +1,16 @@
 const express = require("express");
 const router = require("express").Router();
-const userModel = require("./../model/user");
+const User = require("./../model/user");
 const userService = express();
 userService.use(express.json());
 
 const emailService = require("./emailService");
 
-const response = {
-  status: "success",
-  result: null,
-  message: "",
-};
-
 router.post("/login", async (req, res) => {
-  const user = await userModel
-    .findOne({ email: req.body.email, password: req.body.password })
-    .exec();
+  const user = await User.findOne({
+    email: req.body.email,
+    password: req.body.password,
+  }).exec();
   if (user != null) {
     user.password = null;
     return res.json({
@@ -42,7 +37,7 @@ router.get("/sendOtp", async (req, res) => {
 });
 
 router.get("/getUserByEmail", async (req, res) => {
-  const user = await userModel.findOne({ email: req.query.email }).exec();
+  const user = await User.findOne({ email: req.query.email }).exec();
   if (user != null) {
     user.password = null;
     return res.json({ status: "success", result: user, message: "" });
@@ -56,7 +51,7 @@ router.get("/getUserByEmail", async (req, res) => {
 });
 
 router.get("/forgotPassword", async (req, res) => {
-  const user = await userModel.findOne({ email: req.query.email }).exec();
+  const user = await User.findOne({ email: req.query.email }).exec();
   if (user != null) {
     emailService.sendEmail(req.query.email);
     user.password = null;
@@ -84,10 +79,9 @@ router.get("/validateOtp", async (req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-  const user = await userModel.findOne({ email: req.body.email }).exec();
+  const user = await User.findOne({ email: req.body.email }).exec();
   if (user == null) {
-    await userModel
-      .create(req.body)
+    await User.create(req.body)
       .then((result) => {
         result.password = null;
         res.status(200).json({
@@ -107,8 +101,7 @@ router.post("/register", async (req, res) => {
 });
 
 router.put("/update", async function (req, res) {
-  await userModel
-    .findByIdAndUpdate(req.body._id, req.body, { new: true })
+  await User.findByIdAndUpdate(req.body._id, req.body, { new: true })
     .exec()
     .then((data) => {
       res.json({
@@ -127,12 +120,11 @@ router.put("/update", async function (req, res) {
 });
 
 router.put("/updatePassword", async function (req, res) {
-  await userModel
-    .findOneAndUpdate(
-      { email: req.body.email },
-      { $set: { password: req.body.password } },
-      { new: true }
-    )
+  await User.findOneAndUpdate(
+    { email: req.body.email },
+    { $set: { password: req.body.password } },
+    { new: true }
+  )
     .exec()
     .then((data) => {
       const user = data;
@@ -153,12 +145,11 @@ router.put("/updatePassword", async function (req, res) {
 });
 
 router.put("/changePassword", async function (req, res) {
-  await userModel
-    .findOneAndUpdate(
-      { $and: [{ email: req.body.email }, { password: req.body.password }] },
-      { $set: { password: req.body.newPassword } },
-      { new: true }
-    )
+  await User.findOneAndUpdate(
+    { $and: [{ email: req.body.email }, { password: req.body.password }] },
+    { $set: { password: req.body.newPassword } },
+    { new: true }
+  )
     .exec()
     .then((data) => {
       const user = data;

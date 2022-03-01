@@ -2,14 +2,13 @@ const mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 
-let userDevice = new Schema(
+let userDeviceSchema = new Schema(
   {
     userId: String,
     deviceId: String,
     email: String,
     isDeleted: Boolean,
   },
-  { collection: "userDevice" }
+  { timestamps: true }
 );
-userDevice.set("timestamps", true);
-module.exports = mongoose.model("userDevice", userDevice);
+module.exports = mongoose.model("UserDevice", userDeviceSchema);

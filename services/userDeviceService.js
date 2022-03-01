@@ -27,7 +27,7 @@ router.post("/save", async (req, res) => {
 
 router.get("/getDeviceByEmail", async (req, res) => {
   const device = await UserDevice.findOne({ email: req.query.email });
-  if (device != null && device.length > 0) {
+  if (device) {
     res.json({
       status: "success",
       result: device,
@@ -49,15 +49,15 @@ router.delete("/delete", async (req, res) => {
 
   if (deviceExists) {
     return res.json({
-      status: "failure",
-      result: null,
-      message: "No Device found",
+      status: "success",
+      result: deviceExists,
+      message: "You've successfully unpaired  your device",
     });
   } else {
     return res.json({
-      status: "success",
-      result: device,
-      message: "You've successfully unpaired  your device",
+      status: "failure",
+      result: null,
+      message: "No Device found",
     });
   }
 });

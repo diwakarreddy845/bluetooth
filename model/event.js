@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 
-let event = new Schema(
+let eventSchema = new Schema(
   {
     eventType: String,
     subData: Number,
@@ -11,7 +11,6 @@ let event = new Schema(
     email: String,
     deviceId: String,
   },
-  { collection: "event" }
+  { timestamps: true }
 );
-event.set("timestamps", true);
-module.exports = mongoose.model("event", event);
+module.exports = mongoose.model("Event", eventSchema);
