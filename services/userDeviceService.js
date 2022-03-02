@@ -3,10 +3,6 @@ const router = require("express").Router();
 const UserDevice = require("./../model/userDevice");
 
 router.post("/save", async (req, res) => {
-  const user = await UserDevice.findOne({
-    $or: [{ deviceId: req.body.deviceId }, { email: req.body.email }],
-  }).exec();
-  if (user == null) {
     UserDevice.create(req.body)
       .then((result) =>
         res.status(200).json({
@@ -16,13 +12,6 @@ router.post("/save", async (req, res) => {
         })
       )
       .catch((error) => res.status(500).json({ msg: error }));
-  } else {
-    return res.json({
-      status: "failure",
-      result: "",
-      message: "user already paired with device",
-    });
-  }
 });
 
 router.get("/getDeviceByEmail", async (req, res) => {
@@ -61,5 +50,30 @@ router.delete("/delete", async (req, res) => {
     });
   }
 });
+
+
+/*
+router.post("/save", async (req, res) => {
+  const user = await UserDevice.findOne({
+    $or: [{ deviceId: req.body.deviceId }, { email: req.body.email }],
+  }).exec();
+  if (user == null) {
+    UserDevice.create(req.body)
+      .then((result) =>
+        res.status(200).json({
+          status: "success",
+          result: result,
+          message: "You've successfully paired your device",
+        })
+      )
+      .catch((error) => res.status(500).json({ msg: error }));
+  } else {
+    return res.json({
+      status: "failure",
+      result: "",
+      message: "user already paired with device",
+    });
+  }
+});*/
 
 module.exports = router;
