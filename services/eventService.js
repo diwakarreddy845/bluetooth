@@ -70,10 +70,7 @@ dateConversion = function (hexString, email, deviceId) {
         message: "event saving failed",
       })
     );
-
-    if (error) return error;
   }
 };
-
 
 module.exports = router;
