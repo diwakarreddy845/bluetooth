@@ -4,6 +4,8 @@ const Event = require("./../model/event");
 const eventService = express();
 var hexToBinary = require("hex-to-binary");
 
+const moment = require("moment");
+
 eventService.use(express.json());
 
 hexadecimalConversion = function (hexString) {
@@ -36,6 +38,7 @@ router.post("/save", async (req, res) => {
 
 dateConversion = function (hexString, email, deviceId) {
   const array = hexString.match(/.{1,10}/g);
+  var startDateTime;
   for (let x of array) {
     let twodigitArray = x.match(/.{1,2}/g);
 
@@ -55,10 +58,14 @@ dateConversion = function (hexString, email, deviceId) {
 
     var dateTime = new Date(yearN, monthN - 1, dateN, hourN, minutesN, 0);
 
+    if (typeN == 1) {
+      startDateTime = dateTime;
+    }
     let body = {
       eventDateTime: dateTime,
       eventType: typeN,
       subData: presssureDate,
+      eventStartDateTime: startDateTime,
       email: email,
       deviceId: deviceId,
     };
@@ -72,5 +79,59 @@ dateConversion = function (hexString, email, deviceId) {
     );
   }
 };
+
+router.get("/runningTime", async (req, res) => {
+  const startDate = moment(+req.query.startDate).format();
+  const endDate = moment(+req.query.endDate).format();
+
+  const events = await Event.find({
+    deviceId: req.query.deviceId,
+    email: req.query.email,
+    $and: [
+      {
+        eventDateTime: {
+          $gte: new Date(startDate),
+        },
+      },
+      { eventDateTime: { $lt: new Date(endDate) } },
+    ],
+  });
+  if (events) {
+    let lastLeakTtime;
+    let totalrunningTime = 0;
+    let averageleak = 0;
+    for (let x of events) {
+      if (x.eventType == 2) {
+        totalrunningTime =
+          totalrunningTime +
+          moment(x.eventDateTime).format("X") -
+          moment(x.eventStartDateTime).format("X");
+        lastLeakTtime = null;
+      } else if (x.eventType == 22) {
+        if (lastLeakTtime) {
+          lastLeakTtime = moment(x.eventDateTime).format("X");
+        } else {
+          lastLeakTtime = moment(x.eventStartDateTime).format("X");
+        }
+        averageleak =
+          averageleak +
+          (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
+      }
+    }
+    totalrunningTime = totalrunningTime / 60;
+    averageleak = averageleak / totalrunningTime;
+    res.json({
+      status: "success",
+      result: { useageHours: totalrunningTime, leakAvg: averageleak },
+      message: "Device found",
+    });
+  } else {
+    res.json({
+      status: "failure",
+      result: null,
+      message: "No Device found",
+    });
+  }
+});
 
 module.exports = router;

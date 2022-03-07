@@ -7,6 +7,7 @@ let eventSchema = new Schema(
     eventType: Number,
     subData: Number,
     eventDateTime: Date,
+    eventStartDateTime: Date,
     isDeleted: Boolean,
     email: String,
     deviceId: String,
