@@ -102,8 +102,7 @@ router.get("/runningTime", async (req, res) => {
     let averageleak = 0;
     for (let x of events) {
       if (x.eventType == 2) {
-        totalrunningTime =
-          totalrunningTime +
+        totalrunningTime +=
           moment(x.eventDateTime).format("X") -
           moment(x.eventStartDateTime).format("X");
         lastLeakTtime = null;
@@ -113,8 +112,7 @@ router.get("/runningTime", async (req, res) => {
         } else {
           lastLeakTtime = moment(x.eventStartDateTime).format("X");
         }
-        averageleak =
-          averageleak +
+        averageleak +=
           (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
       }
     }
