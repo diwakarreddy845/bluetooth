@@ -107,13 +107,17 @@ router.get("/runningTime", async (req, res) => {
           moment(x.eventStartDateTime).format("X");
         lastLeakTtime = null;
       } else if (x.eventType == 22) {
-        if (lastLeakTtime) {
-          lastLeakTtime = moment(x.eventDateTime).format("X");
-        } else {
+        if (!lastLeakTtime) {
           lastLeakTtime = moment(x.eventStartDateTime).format("X");
         }
+        console.log(
+          moment(x.eventDateTime).format("X"),
+          lastLeakTtime,
+          x.subData
+        );
         averageleak +=
           (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
+        lastLeakTtime = moment(x.eventDateTime).format("X");
       }
     }
     totalrunningTime = totalrunningTime / 60;
