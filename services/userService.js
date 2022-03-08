@@ -1,6 +1,7 @@
 const express = require("express");
 const router = require("express").Router();
 const User = require("./../model/user");
+const UserDevice = require("./../model/userDevice");
 const userService = express();
 userService.use(express.json());
 
@@ -11,11 +12,16 @@ router.post("/login", async (req, res) => {
     email: req.body.email,
     password: req.body.password,
   }).exec();
+
+  const device = await UserDevice.findOne({
+    email: req.body.email,
+  }).exec();
   if (user != null) {
     user.password = null;
     return res.json({
       status: "success",
       result: user,
+      deviceId: device == null ? null : device.deviceId,
       message: "Login Successful",
     });
   } else {
