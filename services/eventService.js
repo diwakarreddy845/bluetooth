@@ -100,6 +100,7 @@ router.get("/runningTime", async (req, res) => {
     let lastLeakTtime;
     let totalrunningTime = 0;
     let averageleak = 0;
+    let apneaIndex = 0;
     for (let x of events) {
       if (x.eventType == 2) {
         totalrunningTime +=
@@ -113,13 +114,19 @@ router.get("/runningTime", async (req, res) => {
         averageleak +=
           (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
         lastLeakTtime = moment(x.eventDateTime).format("X");
+      } else if (x.eventType == 10 || x.eventType == 9) {
+        apneaIndex += x.subData;
       }
     }
     totalrunningTime = totalrunningTime / 60;
     averageleak = averageleak / totalrunningTime;
     res.json({
       status: "success",
-      result: { useageHours: totalrunningTime, leakAvg: averageleak },
+      result: {
+        useageHours: totalrunningTime,
+        leakAvg: averageleak,
+        ahi: apneaIndex,
+      },
       message: "Device found",
     });
   } else {
