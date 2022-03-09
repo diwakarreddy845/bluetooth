@@ -3,6 +3,7 @@ const router = require("express").Router();
 const Event = require("./../model/event");
 const eventService = express();
 var hexToBinary = require("hex-to-binary");
+const mongoose = require("mongoose");
 
 const moment = require("moment");
 
@@ -106,6 +107,8 @@ router.get("/runningTime", async (req, res) => {
         totalrunningTime +=
           moment(x.eventDateTime).format("X") -
           moment(x.eventStartDateTime).format("X");
+        averageleak +=
+          (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
         lastLeakTtime = null;
       } else if (x.eventType == 22) {
         if (!lastLeakTtime) {
@@ -118,8 +121,9 @@ router.get("/runningTime", async (req, res) => {
         apneaIndex++;
       }
     }
+    totalrunningTime = totalrunningTime / 1000;
     totalrunningTime = totalrunningTime / 60;
-    averageleak = averageleak / (totalrunningTime * 60);
+    averageleak = averageleak / totalrunningTime;
     res.json({
       status: "success",
       result: {
@@ -135,6 +139,21 @@ router.get("/runningTime", async (req, res) => {
       result: null,
       message: "No Device found",
     });
+  }
+});
+
+router.get("/getEventDataBySession", async (req, res) => {
+  if (req.query.session == 0) {
+    const event = await Event.findOne({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: 1,
+    }).sort({
+      _id: -1,
+    });
+    console.log(event._id);
+    res.json(event);
+  } else if (req.query.session == 1) {
   }
 });
 

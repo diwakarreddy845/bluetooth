@@ -3,6 +3,12 @@ const router = require("express").Router();
 const UserDevice = require("./../model/userDevice");
 
 router.post("/save", async (req, res) => {
+  if (
+    req.body.email != null &&
+    req.body.email == "" &&
+    req.body.deviceId != null &&
+    req.body.deviceId == ""
+  ) {
     UserDevice.create(req.body)
       .then((result) =>
         res.status(200).json({
@@ -12,6 +18,12 @@ router.post("/save", async (req, res) => {
         })
       )
       .catch((error) => res.status(500).json({ msg: error }));
+  } else {
+    res.json({
+      status: "failure",
+      message: "Email and DeviceId should not be null or empty",
+    });
+  }
 });
 
 router.get("/getDeviceByEmail", async (req, res) => {
