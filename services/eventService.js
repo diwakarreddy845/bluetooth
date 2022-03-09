@@ -105,30 +105,28 @@ router.get("/runningTime", async (req, res) => {
     for (let x of events) {
       if (x.eventType == 2) {
         totalrunningTime +=
-          moment(x.eventDateTime).format("X") -
-          moment(x.eventStartDateTime).format("X");
-        averageleak +=
-          (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
+          moment(x.eventDateTime).unix() - moment(x.eventStartDateTime).unix();
         lastLeakTtime = null;
       } else if (x.eventType == 22) {
         if (!lastLeakTtime) {
-          lastLeakTtime = moment(x.eventStartDateTime).format("X");
+          lastLeakTtime = moment(x.eventStartDateTime).unix();
         }
-        averageleak +=
-          (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
-        lastLeakTtime = moment(x.eventDateTime).format("X");
+        const avgtime = (moment(x.eventDateTime).unix() - lastLeakTtime) / 60;
+        averageleak += avgtime * x.subData;
+        lastLeakTtime = moment(x.eventDateTime).unix();
+        console.log(averageleak);
       } else if (x.eventType == 10 || x.eventType == 9) {
         apneaIndex++;
       }
     }
-    totalrunningTime = totalrunningTime / 1000;
+
     totalrunningTime = totalrunningTime / 60;
     averageleak = averageleak / totalrunningTime;
     res.json({
       status: "success",
       result: {
         usageHours: totalrunningTime,
-        avgLeak: averageleak,
+        avgLeak: averageleak.toFixed(2),
         ahi: apneaIndex,
       },
       message: "Device found",
