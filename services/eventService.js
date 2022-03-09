@@ -115,11 +115,11 @@ router.get("/runningTime", async (req, res) => {
           (moment(x.eventDateTime).format("X") - lastLeakTtime) * x.subData;
         lastLeakTtime = moment(x.eventDateTime).format("X");
       } else if (x.eventType == 10 || x.eventType == 9) {
-        apneaIndex += x.subData;
+        apneaIndex++;
       }
     }
     totalrunningTime = totalrunningTime / 60;
-    averageleak = averageleak / totalrunningTime;
+    averageleak = averageleak / (totalrunningTime * 60);
     res.json({
       status: "success",
       result: {
