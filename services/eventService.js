@@ -126,7 +126,7 @@ router.get("/runningTime", async (req, res) => {
       status: "success",
       result: {
         usageHours: totalrunningTime,
-        avgLeak: averageleak.toFixed(2),
+        avgLeak: averageleak,
         ahi: apneaIndex,
       },
       message: "Device found",
