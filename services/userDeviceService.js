@@ -5,9 +5,9 @@ const UserDevice = require("./../model/userDevice");
 router.post("/save", async (req, res) => {
   if (
     req.body.email != null &&
-    req.body.email == "" &&
+    req.body.email != "" &&
     req.body.deviceId != null &&
-    req.body.deviceId == ""
+    req.body.deviceId != ""
   ) {
     UserDevice.create(req.body)
       .then((result) =>
