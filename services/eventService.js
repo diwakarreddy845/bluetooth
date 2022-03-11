@@ -114,7 +114,6 @@ router.get("/runningTime", async (req, res) => {
         const avgtime = (moment(x.eventDateTime).unix() - lastLeakTtime) / 60;
         averageleak += avgtime * x.subData;
         lastLeakTtime = moment(x.eventDateTime).unix();
-        console.log(averageleak);
       } else if (x.eventType == 10 || x.eventType == 9) {
         apneaIndex++;
       }
@@ -141,84 +140,76 @@ router.get("/runningTime", async (req, res) => {
 });
 
 router.get("/getEventDataBySession", async (req, res) => {
- let event;
- if (req.query.session == 0) {
-   event = await Event.findOne({
-     deviceId: req.query.deviceId,
-     email: req.query.email,
-     eventType: 1,
-   }).sort({ _id: -1 });
- } else if (req.query.session == 1) {
-   const startDate = moment().day(-7).format();
-   event = await Event.findOne({
-     deviceId: req.query.deviceId,
-     email: req.query.email,
-     eventType: 1,
-     eventDateTime: { $gte: new Date(startDate) },
-   });
- } else if (req.query.session == 2) {
-   const startDate = moment().day(-30).format();
-   event = await Event.findOne({
-     deviceId: req.query.deviceId,
-     email: req.query.email,
-     eventType: 1,
-     eventDateTime: {
-       $gte: new Date(startDate),
-     },
-   });
- } else if (req.query.session == 3) {
-   const startDate = moment().day(-90).format();
-   event = await Event.findOne({
-     deviceId: req.query.deviceId,
-     email: req.query.email,
-     eventType: 1,
-     eventDateTime: {
-       $gte: new Date(startDate),
-     },
-   });
- }
- console.log(event.id);
- const events = await Event.find({ _id: { $gte: event.id } });
- if (events) {
-   let lastLeakTtime;
-   let totalrunningTime = 0;
-   let averageleak = 0;
-   let apneaIndex = 0;
-   for (let x of events) {
-     if (x.eventType == 2) {
-       totalrunningTime +=
-         moment(x.eventDateTime).unix() - moment(x.eventStartDateTime).unix();
-       lastLeakTtime = null;
-     } else if (x.eventType == 22) {
-       if (!lastLeakTtime) {
-         lastLeakTtime = moment(x.eventStartDateTime).unix();
-       }
-       const avgtime = (moment(x.eventDateTime).unix() - lastLeakTtime) / 60;
-       averageleak += avgtime * x.subData;
-       lastLeakTtime = moment(x.eventDateTime).unix();
-     } else if (x.eventType == 10 || x.eventType == 9) {
-       apneaIndex++;
-     }
-   }
+  let event, startDate;
+  if (req.query.session == 0) {
+    event = await Event.findOne({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: 1,
+    }).sort({ _id: -1 });
+  } else if (req.query.session == 1) {
+    startDate = moment().day(-7).format();
+  } else if (req.query.session == 2) {
+    startDate = moment().day(-30).format();
+  } else if (req.query.session == 3) {
+    startDate = moment().day(-90).format();
+  }
+  if (!event)
+    event = await Event.findOne({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: 1,
+      eventDateTime: {
+        $gte: new Date(startDate),
+      },
+    });
+  const events = await Event.find({ _id: { $gte: event.id } });
+  if (events) {
+    let lastLeakTtime;
+    let totalrunningTime = 0;
+    let averageleak = 0;
+    let apneaIndex = 0;
+    for (let x of events) {
+      if (x.eventType === 2) {
+        let status =
+          moment(x.eventDateTime).valueOf() -
+          moment(x.eventStartDateTime).valueOf();
+        totalrunningTime += status;
+        const avgtime =
+          (moment(x.eventDateTime).valueOf() - lastLeakTtime) / 1000 / 60;
+        averageleak += avgtime * x.subData;
+        lastLeakTtime = null;
+      } else if (x.eventType === 22) {
+        if (!lastLeakTtime) {
+          lastLeakTtime = moment(x.eventStartDateTime).valueOf();
+        }
+        const avgtime =
+          (moment(x.eventDateTime).valueOf() - lastLeakTtime) / 1000 / 60;
+        averageleak += avgtime * x.subData;
+        lastLeakTtime = moment(x.eventDateTime).valueOf();
+      } else if (x.eventType === 10 || x.eventType === 9) {
+        apneaIndex++;
+      }
+    }
 
-   totalrunningTime = totalrunningTime / 60;
-   averageleak = averageleak / totalrunningTime;
-   res.json({
-     status: "success",
-     result: {
-       usageHours: totalrunningTime,
-       avgLeak: averageleak,
-       ahi: apneaIndex,
-     },
-     message: "Device found",
-   });
- } else {
-   res.json({
-     status: "failure",
-     result: null,
-     message: "No Device found",
-   });
- }
+    totalrunningTime = totalrunningTime / 1000 / 60;
+    averageleak = averageleak / totalrunningTime;
+    res.json({
+      status: "success",
+      result: {
+        usageHours: totalrunningTime,
+        avgLeak: averageleak,
+        ahi: apneaIndex / totalrunningTime / 60,
+      },
+      message: "Device found",
+    });
+  } else {
+    res.json({
+      status: "failure",
+      result: null,
+      message: "No Device found",
+    });
+  }
 });
 
 module.exports = router;
