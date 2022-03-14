@@ -27,6 +27,12 @@ binaryToHexadecimal = function (binaryStr) {
 router.post("/save", async (req, res) => {
   try {
     let device = req.body.event;
+    if (device) {
+      const deletedItem = await Event.deleteMany({
+        email: req.body.email,
+        deviceId: req.body.deviceId,
+      });
+    }
     device = device.replace(/\s/g, "");
     device = device.replace(/,/g, "");
 
