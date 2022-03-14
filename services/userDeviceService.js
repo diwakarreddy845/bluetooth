@@ -27,7 +27,9 @@ router.post("/save", async (req, res) => {
 });
 
 router.get("/getDeviceByEmail", async (req, res) => {
-  const device = await UserDevice.findOne({ email: req.query.email });
+  const device = await UserDevice.findOne({ email: req.query.email }).catch(
+    (err) => console.error(err)
+  );
   if (device) {
     res.json({
       status: "success",
@@ -46,7 +48,7 @@ router.get("/getDeviceByEmail", async (req, res) => {
 router.delete("/delete", async (req, res) => {
   const deviceExists = await UserDevice.findOneAndDelete({
     email: req.query.email,
-  });
+  }).catch((err) => console.error(err));
 
   if (deviceExists) {
     return res.json({

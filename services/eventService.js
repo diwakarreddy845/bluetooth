@@ -25,16 +25,24 @@ binaryToHexadecimal = function (binaryStr) {
 };
 
 router.post("/save", async (req, res) => {
-  let device = req.body.event;
+  try {
+    let device = req.body.event;
+    device = device.replace(/\s/g, "");
+    device = device.replace(/,/g, "");
 
-  device = device.replace(/\s/g, "");
-  device = device.replace(/,/g, "");
-  dateConversion(device, req.body.email, req.body.deviceId);
-  res.json({
-    status: "success",
-    result: [],
-    message: "Event Data saved",
-  });
+    dateConversion(device, req.body.email, req.body.deviceId);
+    res.json({
+      status: "success",
+      result: [],
+      message: "Event Data saved",
+    });
+  } catch (e) {
+    res.status(500).json({
+      status: "Failure",
+      result: "",
+      message: "event saving failed",
+    });
+  }
 });
 
 dateConversion = function (hexString, email, deviceId) {
@@ -82,59 +90,69 @@ dateConversion = function (hexString, email, deviceId) {
 };
 
 router.get("/runningTime", async (req, res) => {
-  const startDate = moment(+req.query.startDate).format();
-  const endDate = moment(+req.query.endDate).format();
+  try {
+    const startDate = moment(+req.query.startDate).format();
+    const endDate = moment(+req.query.endDate).format();
 
-  const events = await Event.find({
-    deviceId: req.query.deviceId,
-    email: req.query.email,
-    $and: [
-      {
-        eventDateTime: {
-          $gte: new Date(startDate),
+    const events = await Event.find({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      $and: [
+        {
+          eventDateTime: {
+            $gte: new Date(startDate),
+          },
         },
-      },
-      { eventDateTime: { $lt: new Date(endDate) } },
-    ],
-  });
-  if (events) {
-    let lastLeakTtime;
-    let totalrunningTime = 0;
-    let averageleak = 0;
-    let apneaIndex = 0;
-    for (let x of events) {
-      if (x.eventType == 2) {
-        totalrunningTime +=
-          moment(x.eventDateTime).unix() - moment(x.eventStartDateTime).unix();
-        lastLeakTtime = null;
-      } else if (x.eventType == 22) {
-        if (!lastLeakTtime) {
-          lastLeakTtime = moment(x.eventStartDateTime).unix();
-        }
-        const avgtime = (moment(x.eventDateTime).unix() - lastLeakTtime) / 60;
-        averageleak += avgtime * x.subData;
-        lastLeakTtime = moment(x.eventDateTime).unix();
-      } else if (x.eventType == 10 || x.eventType == 9) {
-        apneaIndex++;
-      }
-    }
+        { eventDateTime: { $lt: new Date(endDate) } },
+      ],
+    }).catch((err) => console.error(err));
 
-    totalrunningTime = totalrunningTime / 60;
-    averageleak = averageleak / totalrunningTime;
-    res.json({
-      status: "success",
-      result: {
-        usageHours: totalrunningTime,
-        avgLeak: averageleak,
-        ahi: apneaIndex,
-      },
-      message: "Device found",
-    });
-  } else {
+    if (events) {
+      let lastLeakTtime;
+      let totalrunningTime = 0;
+      let averageleak = 0;
+      let apneaIndex = 0;
+      for (let x of events) {
+        if (x.eventType == 2) {
+          totalrunningTime +=
+            moment(x.eventDateTime).unix() -
+            moment(x.eventStartDateTime).unix();
+          lastLeakTtime = null;
+        } else if (x.eventType == 22) {
+          if (!lastLeakTtime) {
+            lastLeakTtime = moment(x.eventStartDateTime).unix();
+          }
+          const avgtime = (moment(x.eventDateTime).unix() - lastLeakTtime) / 60;
+          averageleak += avgtime * x.subData;
+          lastLeakTtime = moment(x.eventDateTime).unix();
+        } else if (x.eventType == 10 || x.eventType == 9) {
+          apneaIndex++;
+        }
+      }
+
+      totalrunningTime = totalrunningTime / 60;
+      averageleak = averageleak / totalrunningTime;
+      res.json({
+        status: "success",
+        result: {
+          usageHours: totalrunningTime,
+          avgLeak: averageleak,
+          ahi: apneaIndex,
+        },
+        message: "Events found",
+      });
+    } else {
+      res.json({
+        status: "failure",
+        result: null,
+        message: "No Events found",
+      });
+    }
+  } catch (e) {
     res.json({
       status: "failure",
       result: null,
-      message: "No Device found",
+      message: "No Events found",
     });
   }
 });
@@ -146,13 +164,17 @@ router.get("/getEventDataBySession", async (req, res) => {
       deviceId: req.query.deviceId,
       email: req.query.email,
       eventType: 1,
-    }).sort({ _id: -1 });
+    })
+      .sort({ _id: -1 })
+      .catch((err) => console.error(err));
   } else if (req.query.session == 1) {
     startDate = moment().day(-7).format();
   } else if (req.query.session == 2) {
     startDate = moment().day(-30).format();
   } else if (req.query.session == 3) {
     startDate = moment().day(-90).format();
+  } else if (req.query.session == 3) {
+    startDate = moment().day(-365).format();
   }
   if (!event)
     event = await Event.findOne({
@@ -162,8 +184,10 @@ router.get("/getEventDataBySession", async (req, res) => {
       eventDateTime: {
         $gte: new Date(startDate),
       },
-    });
-  const events = await Event.find({ _id: { $gte: event.id } });
+    }).catch((err) => console.error(err));
+  const events = await Event.find({ _id: { $gte: event.id } }).catch((err) =>
+    console.error(err)
+  );
   if (events) {
     let lastLeakTtime;
     let totalrunningTime = 0;

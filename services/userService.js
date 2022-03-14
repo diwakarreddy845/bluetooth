@@ -11,11 +11,14 @@ router.post("/login", async (req, res) => {
   const user = await User.findOne({
     email: req.body.email,
     password: req.body.password,
-  }).exec();
+  }).exec()
+    .catch((err) => console.error(err));
 
   const device = await UserDevice.findOne({
     email: req.body.email,
-  }).exec();
+  })
+    .exec()
+    .catch((err) => console.error(err));
   if (user != null) {
     user.password = null;
     return res.json({
@@ -34,7 +37,7 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/sendOtp", async (req, res) => {
-  emailService.sendEmail(req.query.email);
+  emailService.sendEmail(req.query.email).catch((err) => console.error(err));
   return res.json({
     status: "success",
     result: null,
@@ -43,7 +46,9 @@ router.get("/sendOtp", async (req, res) => {
 });
 
 router.get("/getUserByEmail", async (req, res) => {
-  const user = await User.findOne({ email: req.query.email }).exec();
+  const user = await User.findOne({ email: req.query.email })
+    .exec()
+    .catch((err) => console.error(err));
   if (user != null) {
     user.password = null;
     return res.json({ status: "success", result: user, message: "" });
@@ -57,7 +62,9 @@ router.get("/getUserByEmail", async (req, res) => {
 });
 
 router.get("/forgotPassword", async (req, res) => {
-  const user = await User.findOne({ email: req.query.email }).exec();
+  const user = await User.findOne({ email: req.query.email })
+    .exec()
+    .catch((err) => console.error(err));
   if (user != null) {
     emailService.sendEmail(req.query.email);
     user.password = null;
@@ -76,7 +83,9 @@ router.get("/forgotPassword", async (req, res) => {
 });
 
 router.get("/validateOtp", async (req, res) => {
-  const validate = emailService.validateOtp(req.query.email, req.query.otp);
+  const validate = emailService
+    .validateOtp(req.query.email, req.query.otp)
+    .catch((err) => console.error(err));
   return res.json({
     status: "success",
     result: validate,
@@ -85,7 +94,9 @@ router.get("/validateOtp", async (req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-  const user = await User.findOne({ email: req.body.email }).exec();
+  const user = await User.findOne({ email: req.body.email })
+    .exec()
+    .catch((err) => console.error(err));
   if (user == null) {
     await User.create(req.body)
       .then((result) => {

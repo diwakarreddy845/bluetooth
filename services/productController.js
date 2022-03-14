@@ -3,7 +3,9 @@ const router = require("express").Router();
 const Product = require("./../model/product");
 
 router.post("/save", async (req, res) => {
-  const productExists = await Product.findOne({ modelNo: req.body.modelNo });
+  const productExists = await Product.findOne({
+    modelNo: req.body.modelNo,
+  }).catch((err) => console.error(err));
   if (productExists) {
     return res.json({
       status: "failure",
@@ -26,7 +28,7 @@ router.post("/save", async (req, res) => {
 router.delete("/delete", async (req, res) => {
   const productExists = await Product.findOneAndDelete({
     email: req.query.email,
-  });
+  }).catch((err) => console.error(err));
 
   if (productExists) {
     return res.json({
@@ -45,7 +47,9 @@ router.delete("/delete", async (req, res) => {
 
 router.get("/getProduct", async (req, res) => {
   const modelNo = req.query.serialNumber.charAt(4);
-  const productExists = await Product.findOne({ modelNo: modelNo });
+  const productExists = await Product.findOne({ modelNo: modelNo }).catch(
+    (err) => console.error(err)
+  );
   if (productExists) {
     res.json({
       status: "success",
@@ -63,5 +67,6 @@ router.get("/getProduct", async (req, res) => {
     });
   }
 });
+  
 
 module.exports = router;
