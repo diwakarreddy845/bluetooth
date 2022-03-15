@@ -193,7 +193,7 @@ router.get("/getEventDataBySession", async (req, res) => {
       },
     }).catch((err) => console.error(err));
   }
-  const events = null;
+  let events = null;
   if (event)
     events = await Event.find({ _id: { $gte: event.id } }).catch((err) =>
       console.error(err)
