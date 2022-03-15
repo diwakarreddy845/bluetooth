@@ -41,6 +41,7 @@ router.post("/save", async (req, res) => {
 router.get("/getParamsByDeviceId", async (req, res) => {
   const params = await Parameter.findOne({
     deviceId: req.query.deviceId,
+    email: req.query.email,
   }).catch((err) => console.error(err));
   if (params) {
     res.json({
