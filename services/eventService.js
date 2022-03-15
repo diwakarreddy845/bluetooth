@@ -180,7 +180,7 @@ router.get("/getEventDataBySession", async (req, res) => {
     startDate = moment().subtract(30, "d").format();
   } else if (req.query.session == 3) {
     startDate = moment().subtract(90, "d").format();
-  } else if (req.query.session == 3) {
+  } else if (req.query.session == 4) {
     startDate = moment().subtract(365, "d").format();
   }
   if (!event) {
@@ -239,8 +239,12 @@ router.get("/getEventDataBySession", async (req, res) => {
     });
   } else {
     res.json({
-      status: "failure",
-      result: null,
+      status: "success",
+      result: {
+        usageHours: 0,
+        avgLeak: 0,
+        ahi: 0,
+      },
       message: "No Data found",
     });
   }
