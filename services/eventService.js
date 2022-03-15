@@ -174,15 +174,16 @@ router.get("/getEventDataBySession", async (req, res) => {
       .sort({ _id: -1 })
       .catch((err) => console.error(err));
   } else if (req.query.session == 1) {
-    startDate = moment().day(-7).format();
+    startDate = moment().subtract(7, "d").format();
+    console.log(startDate);
   } else if (req.query.session == 2) {
-    startDate = moment().day(-30).format();
+    startDate = moment().subtract(30, "d").format();
   } else if (req.query.session == 3) {
-    startDate = moment().day(-90).format();
+    startDate = moment().subtract(90, "d").format();
   } else if (req.query.session == 3) {
-    startDate = moment().day(-365).format();
+    startDate = moment().subtract(365, "d").format();
   }
-  if (!event)
+  if (!event) {
     event = await Event.findOne({
       deviceId: req.query.deviceId,
       email: req.query.email,
@@ -191,9 +192,12 @@ router.get("/getEventDataBySession", async (req, res) => {
         $gte: new Date(startDate),
       },
     }).catch((err) => console.error(err));
-  const events = await Event.find({ _id: { $gte: event.id } }).catch((err) =>
-    console.error(err)
-  );
+  }
+  const events = null;
+  if (event)
+    events = await Event.find({ _id: { $gte: event.id } }).catch((err) =>
+      console.error(err)
+    );
   if (events) {
     let lastLeakTtime;
     let totalrunningTime = 0;
@@ -237,7 +241,7 @@ router.get("/getEventDataBySession", async (req, res) => {
     res.json({
       status: "failure",
       result: null,
-      message: "No Device found",
+      message: "No Data found",
     });
   }
 });
