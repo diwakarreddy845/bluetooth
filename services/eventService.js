@@ -242,4 +242,30 @@ router.get("/getEventDataBySession", async (req, res) => {
   }
 });
 
+router.get("/totalRunningTime", async (req, res) => {
+  const eventList = await Event.find({
+    deviceId: req.query.deviceId,
+    eventType: 2,
+  }).catch((err) => console.error(err));
+  if (eventList) {
+    let totalTime = 0;
+    for (let x of eventList) {
+      let startTime = moment(x.eventStartDateTime).valueOf();
+      let endTime = moment(x.eventDateTime).valueOf();
+      totalTime += endTime - startTime;
+    }
+    res.json({
+      status: "success",
+      result: totalTime / 1000 / 60,
+      message: "Device found",
+    });
+  } else {
+    res.json({
+      status: "failure",
+      result: null,
+      message: "No Device found",
+    });
+  }
+});
+
 module.exports = router;
