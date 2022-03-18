@@ -461,7 +461,7 @@ router.get("/statisticsBySession", async (req, res) => {
       medianHoursPerNight: median,
       noofDays: noofDays,
       notUsed: notUseddays,
-      averageleak: averageleak,
+      averageleak: averageleak / 60,
       meadianLeak: mLeakValue,
       lessThanFour: lessThanFour,
       fourToSix: fourToSix,
