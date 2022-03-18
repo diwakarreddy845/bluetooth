@@ -9,8 +9,19 @@ router.post("/save", async (req, res) => {
     req.body.params != null &&
     req.body.params != ""
   ) {
-    const myArray = req.body.params.split("_");
-
+    let startingPressure = req.body.params;
+    const inputArray = startingPressure.split(",");
+    var i,
+      j,
+      temporary,
+      chunk = 5,
+      result = "";
+    for (i = 0, j = inputArray.length; i < j; i += chunk) {
+      temporary = inputArray.slice(i, i + chunk);
+      const re = String.fromCharCode.apply(null, temporary);
+      result += parseInt(re, 16) + "_";
+    }
+    const myArray = result.split("_");
     let body = {
       startingPressure: myArray[0],
       minimumPressure: myArray[1],

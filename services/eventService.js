@@ -174,14 +174,13 @@ router.get("/getEventDataBySession", async (req, res) => {
       .sort({ _id: -1 })
       .catch((err) => console.error(err));
   } else if (req.query.session == 1) {
-    startDate = moment().subtract(7, "d").format();
-    console.log(startDate);
+    startDate = moment().subtract(7, "d").startOf("day").format();
   } else if (req.query.session == 2) {
-    startDate = moment().subtract(30, "d").format();
+    startDate = moment().subtract(30, "d").startOf("day").format();
   } else if (req.query.session == 3) {
-    startDate = moment().subtract(90, "d").format();
+    startDate = moment().subtract(90, "d").startOf("day").format();
   } else if (req.query.session == 4) {
-    startDate = moment().subtract(365, "d").format();
+    startDate = moment().subtract(365, "d").startOf("day").format();
   }
   if (!event) {
     event = await Event.findOne({
@@ -269,8 +268,123 @@ router.get("/totalRunningTime", async (req, res) => {
     });
   } else {
     res.json({
-      status: "failure",
-      result: null,
+      status: "success",
+      result: 0,
+      message: "No Device found",
+    });
+  }
+});
+
+router.get("/statisticsBySession", async (req, res) => {
+  let notUseddays = 0;
+  let event, startDate;
+  if (req.query.session == 0) {
+    notUseddays = 1;
+    event = await Event.findOne({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: 1,
+    })
+      .sort({ _id: -1 })
+      .catch((err) => console.error(err));
+  } else if (req.query.session == 1) {
+    notUseddays = 7;
+    startDate = moment().subtract(7, "d").startOf("day").format();
+  } else if (req.query.session == 2) {
+    notUseddays = 30;
+    startDate = moment().subtract(30, "d").startOf("day").format();
+  } else if (req.query.session == 3) {
+    notUseddays = 90;
+    startDate = moment().subtract(90, "d").startOf("day").format();
+  } else if (req.query.session == 4) {
+    notUseddays = 365;
+    startDate = moment().subtract(365, "d").startOf("day").format();
+  }
+  if (!event) {
+    event = await Event.findOne({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: 1,
+      eventDateTime: {
+        $gte: new Date(startDate),
+      },
+    }).catch((err) => console.error(err));
+  }
+  let eventList = null;
+  if (event)
+    eventList = await Event.find({
+      _id: { $gte: event.id },
+    }).catch((err) => console.error(err));
+  if (eventList) {
+    let lastLeakTtime;
+    let totalrunningTime = 0;
+    let averageleak = 0;
+    for (let x of events) {
+      if (x.eventType === 2) {
+        let status =
+          moment(x.eventDateTime).valueOf() -
+          moment(x.eventStartDateTime).valueOf();
+        totalrunningTime += status;
+        const avgtime =
+          (moment(x.eventDateTime).valueOf() - lastLeakTtime) / 1000 / 60;
+        averageleak += avgtime * x.subData;
+        lastLeakTtime = null;
+      } else if (x.eventType === 22) {
+        if (!lastLeakTtime) {
+          lastLeakTtime = moment(x.eventStartDateTime).valueOf();
+        }
+        const avgtime =
+          (moment(x.eventDateTime).valueOf() - lastLeakTtime) / 1000 / 60;
+        averageleak += avgtime * x.subData;
+        lastLeakTtime = moment(x.eventDateTime).valueOf();
+      }
+    }
+
+    totalrunningTime = totalrunningTime / 1000 / 60;
+    averageleak = averageleak / totalrunningTime;
+    const distict = await Event.aggregate([
+      {
+        $match: {
+          _id: { $gte: mongoose.Types.ObjectId(event.id) },
+          deviceId: req.query.deviceId,
+          email: req.query.email,
+        },
+      },
+      {
+        $project: {
+          year: { $year: "$eventDateTime" },
+          month: { $month: "$eventDateTime" },
+          day: { $dayOfMonth: "$eventDateTime" },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          distinctDate: {
+            $addToSet: { year: "$year", month: "$month", day: "$day" },
+          },
+        },
+      },
+    ]);
+    notUseddays = notUseddays - distict[0].distinctDate.length;
+    let noofDays = distict[0].distinctDate.length;
+    let response = {
+      usage: totalrunningTime / 1000 / 60,
+      averageHoursPerNight: totalrunningTime / noofDays,
+      noofDays: noofDays,
+      notUsed: notUseddays,
+      averageleak: averageleak,
+    };
+
+    res.json({
+      status: "success",
+      result: response,
+      message: "No Device found",
+    });
+  } else {
+    res.json({
+      status: "success",
+      result: 0,
       message: "No Device found",
     });
   }
