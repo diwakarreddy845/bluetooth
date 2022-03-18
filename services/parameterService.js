@@ -23,16 +23,27 @@ router.post("/save", async (req, res) => {
     }
     const myArray = result.split("_");
     let body = {
-      startingPressure: myArray[0],
-      minimumPressure: myArray[1],
-      maximumPressure: myArray[2],
-      EZEX: myArray[3],
-      startingRampPressure: myArray[4],
+      startingPressure: myArray[0] / 10,
+      minimumPressure: myArray[1] / 10,
+      maximumPressure: myArray[2] / 10,
+      EZEX: myArray[3] / 10,
+      startingRampPressure: myArray[4] / 10,
       rampDuration: myArray[5],
       email: req.body.email,
       deviceId: req.body.deviceId,
     };
-    Parameter.create(body)
+
+    await Parameter.deleteMany({
+      email: req.body.email,
+      deviceId: req.body.deviceId,
+    })
+      .then(function () {
+        console.log("Data deleted"); // Success
+      })
+      .catch(function (error) {
+        console.log(error); // Failure
+      });
+    await Parameter.create(body)
       .then((result) =>
         res.status(200).json({
           status: "success",
