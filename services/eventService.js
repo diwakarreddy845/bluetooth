@@ -17,6 +17,11 @@ hexadecimalConversion = function (hexString) {
   return result;
 };
 
+const percentile = (arr, val) => {
+  let i = Math.ceil((val / 100) * arr.length);
+  return arr[i - 1];
+};
+
 binaryToHexadecimal = function (binaryStr) {
   if (binaryStr.includes("1")) {
     return parseInt(binaryStr.replace(/\b0+/g, ""), 2).toString(10);
@@ -317,8 +322,9 @@ router.get("/statisticsBySession", async (req, res) => {
   let eventList = null;
   if (event)
     eventList = await Event.find({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
       _id: { $gte: event.id },
-      eventType: { $in: [2, 22] },
     })
       .sort({ _id: 1 })
       .catch((err) => console.error(err));
@@ -326,6 +332,9 @@ router.get("/statisticsBySession", async (req, res) => {
     let lastLeakTtime;
     let averageleak = 0;
     let meadianLeak = [];
+    let avgPressureArry = [];
+    let lastPressureTtime;
+    let averagePressure = 0;
     for (let x of eventList) {
       if (x.eventType === 2) {
         const avgtime =
@@ -333,6 +342,16 @@ router.get("/statisticsBySession", async (req, res) => {
         averageleak += avgtime * x.subData;
         lastLeakTtime = null;
         meadianLeak.push(avgtime * x.subData);
+
+        if (!lastPressureTtime) {
+          lastPressureTtime = moment(x.eventStartDateTime).valueOf();
+        }
+        const avgPressure =
+          (moment(x.eventDateTime).valueOf() - lastPressureTtime) / 1000 / 60;
+        if (avgPressure * x.subData !== 0)
+          avgPressureArry.push(avgPressure * x.subData);
+        averagePressure += avgPressure * x.subData;
+        lastPressureTtime = null;
       } else if (x.eventType === 22) {
         if (!lastLeakTtime) {
           lastLeakTtime = moment(x.eventStartDateTime).valueOf();
@@ -342,6 +361,22 @@ router.get("/statisticsBySession", async (req, res) => {
         averageleak += avgtime * x.subData;
         meadianLeak.push(avgtime * x.subData);
         lastLeakTtime = moment(x.eventDateTime).valueOf();
+      } else if (
+        x.eventType === 23 ||
+        x.eventType === 24 ||
+        x.eventType === 25 ||
+        x.eventType === 26 ||
+        x.eventType === 27
+      ) {
+        if (!lastPressureTtime) {
+          lastPressureTtime = moment(x.eventStartDateTime).valueOf();
+        }
+        const avgPressure =
+          (moment(x.eventDateTime).valueOf() - lastPressureTtime) / 1000 / 60;
+        averagePressure += avgPressure * x.subData;
+        lastPressureTtime = moment(x.eventDateTime).valueOf();
+        if (avgPressure * x.subData !== 0)
+          avgPressureArry.push(avgPressure * x.subData);
       }
     }
 
@@ -369,7 +404,8 @@ router.get("/statisticsBySession", async (req, res) => {
       },
     ]);
     let totalRunningTime = deviceRunningTime[0].time;
-    averageleak = averageleak / totalRunningTime;
+    averageleak = averageleak / totalRunningTime / 60;
+    averagePressure = averagePressure / totalRunningTime / 60;
     const distict = await Event.aggregate([
       {
         $match: {
@@ -440,6 +476,12 @@ router.get("/statisticsBySession", async (req, res) => {
         : (runningtimByDays[mid - 1].timeSum + runningtimByDays[mid].timeSum) /
           2;
 
+    avgPressureArry.sort(function (a, b) {
+      return a - b;
+    });
+
+    const percentile90Pressue = percentile(avgPressureArry, 90);
+    const percentile95Pressue = percentile(avgPressureArry, 95);
     const m = Math.floor(meadianLeak.length / 2);
     const mLeakValue =
       meadianLeak.length % 2 !== 0
@@ -455,18 +497,28 @@ router.get("/statisticsBySession", async (req, res) => {
 
     let noofDays = distict[0].distinctDate.length;
 
+    meadianLeak = meadianLeak.filter((val) => val !== 0);
+    meadianLeak.sort(function (a, b) {
+      return a - b;
+    });
+    const percentileLeak = percentile(meadianLeak, 90);
+
     let response = {
       usage: totalRunningTime,
       averageHoursPerNight: totalRunningTime / noofDays,
       medianHoursPerNight: median,
       noofDays: noofDays,
       notUsed: notUseddays,
-      averageleak: averageleak / 60,
+      averageleak: averageleak,
       meadianLeak: mLeakValue,
       lessThanFour: lessThanFour,
       fourToSix: fourToSix,
       sixToEight: sixToEight,
       eightPlus: eightPlus,
+      nintyPercentileLeak: percentileLeak,
+      averagePressure: averagePressure,
+      nintyPercentilePressure: percentile90Pressue,
+      nintyFivePercentilePressure: percentile95Pressue,
     };
 
     res.json({
@@ -478,7 +530,7 @@ router.get("/statisticsBySession", async (req, res) => {
     res.json({
       status: "success",
       result: 0,
-      message: "No Device found",
+      message: "No Event Data found",
     });
   }
 });
