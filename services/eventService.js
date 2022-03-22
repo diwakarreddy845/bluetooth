@@ -199,9 +199,11 @@ router.get("/getEventDataBySession", async (req, res) => {
   }
   let events = null;
   if (event)
-    events = await Event.find({ _id: { $gte: event.id } }).catch((err) =>
-      console.error(err)
-    );
+    events = await Event.find({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      _id: { $gte: event.id },
+    }).catch((err) => console.error(err));
   if (events) {
     let lastLeakTtime;
     let totalrunningTime = 0;
