@@ -11,7 +11,8 @@ router.post("/login", async (req, res) => {
   const user = await User.findOne({
     email: req.body.email,
     password: req.body.password,
-  }).exec()
+  })
+    .exec()
     .catch((err) => console.error(err));
 
   const device = await UserDevice.findOne({
@@ -83,9 +84,7 @@ router.get("/forgotPassword", async (req, res) => {
 });
 
 router.get("/validateOtp", async (req, res) => {
-  const validate = emailService
-    .validateOtp(req.query.email, req.query.otp)
-    .catch((err) => console.error(err));
+  const validate = emailService.validateOtp(req.query.email, req.query.otp);
   return res.json({
     status: "success",
     result: validate,
