@@ -29,6 +29,7 @@ app.use("/user", require("./services/userService"));
 app.use("/device", require("./services/userDeviceService"));
 app.use("/event", require("./services/eventService"));
 app.use("/params", require("./services/parameterService"));
+app.use("/feedback", require("./services/feedbackService"));
 
 app.listen(PORT, () => {
   console.log("Server started listening on port : ", PORT);

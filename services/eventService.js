@@ -233,13 +233,16 @@ router.get("/getEventDataBySession", async (req, res) => {
     }
 
     totalrunningTime = totalrunningTime / 1000 / 60;
-    averageleak = averageleak / totalrunningTime;
+    if (totalrunningTime > 0) {
+      averageleak = averageleak / totalrunningTime;
+      apneaIndex = apneaIndex / totalrunningTime / 60;
+    }
     res.json({
       status: "success",
       result: {
         usageHours: totalrunningTime,
         avgLeak: averageleak,
-        ahi: apneaIndex / totalrunningTime / 60,
+        ahi: apneaIndex,
       },
       message: "Device found",
     });
