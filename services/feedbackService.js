@@ -13,7 +13,7 @@ router.post("/save", async (req, res) => {
         res.status(200).json({
           status: "success",
           result: result,
-          message: "You've successfully saved",
+          message: "Your feedback has been submitted successfully",
         })
       )
       .catch((error) => res.status(500).json({ msg: error }));
