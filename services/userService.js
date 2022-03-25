@@ -38,7 +38,7 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/sendOtp", async (req, res) => {
-  emailService.sendEmail(req.query.email).catch((err) => console.error(err));
+  emailService.sendEmail(req.query.email);
   return res.json({
     status: "success",
     result: null,
