@@ -470,7 +470,7 @@ router.get("/statisticsBySession", async (req, res) => {
       },
     ]);
 
-    let lessThanFour = 0,
+    let greaterThanFour = 0,
       fourToSix = 0,
       sixToEight = 0,
       eightPlus = 0;
@@ -493,10 +493,16 @@ router.get("/statisticsBySession", async (req, res) => {
         ? meadianLeak[m]
         : (meadianLeak[m - 1] + meadianLeak[m]) / 2;
     for (let y of runningtimByDays) {
-      if (y.timeSum <= 4) lessThanFour++;
-      else if (y.timeSum > 4 && y.timeSum <= 6) fourToSix++;
-      else if (y.timeSum > 6 && y.timeSum <= 8) sixToEight++;
-      else if (y.timeSum > 8) eightPlus++;
+      if (y.timeSum > 4 && y.timeSum <= 6) {
+        fourToSix++;
+        greaterThanFour++;
+      } else if (y.timeSum > 6 && y.timeSum <= 8) {
+        sixToEight++;
+        greaterThanFour++;
+      } else if (y.timeSum > 8) {
+        eightPlus++;
+        greaterThanFour++;
+      }
     }
     notUseddays = notUseddays - distict[0].distinctDate.length;
 
@@ -516,7 +522,7 @@ router.get("/statisticsBySession", async (req, res) => {
       notUsed: notUseddays,
       averageleak: averageleak,
       meadianLeak: mLeakValue,
-      lessThanFour: lessThanFour,
+      greaterThanFour: greaterThanFour,
       fourToSix: fourToSix,
       sixToEight: sixToEight,
       eightPlus: eightPlus,
