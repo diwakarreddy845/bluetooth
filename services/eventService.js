@@ -366,13 +366,7 @@ router.get("/statisticsBySession", async (req, res) => {
         averageleak += avgtime * x.subData;
         meadianLeak.push(avgtime * x.subData);
         lastLeakTtime = moment(x.eventDateTime).valueOf();
-      } else if (
-        x.eventType === 23 ||
-        x.eventType === 24 ||
-        x.eventType === 25 ||
-        x.eventType === 26 ||
-        x.eventType === 27
-      ) {
+      } else if (x.eventType === 24) {
         if (!lastPressureTtime) {
           lastPressureTtime = moment(x.eventStartDateTime).valueOf();
         }
