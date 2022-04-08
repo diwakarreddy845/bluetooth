@@ -14,6 +14,7 @@ let userSchema = new Schema(
     state: String,
     country: String,
     pincode: Number,
+    countryCode: String,
     mobile: String,
     password: String,
     isDeleted: Boolean,
