@@ -100,6 +100,136 @@ dateConversion = function (hexString, email, deviceId) {
   }
 };
 
+const getAverageHorsPerNight = function (eventData, map) {
+  let startDate = moment(+eventData.eventStartDateTime).format("DD-MM-YYYY");
+  let endDate = moment(+eventData.eventDateTime).format("DD-MM-YYYY");
+
+  if (startDate == endDate) {
+    let timeDiff =
+      moment(eventData.eventDateTime).valueOf() -
+      moment(eventData.eventStartDateTime).valueOf();
+    if (map.has(startDate)) {
+      map.set(startDate, map.get(startDate) + timeDiff / (1000 * 60 * 60));
+    } else {
+      map.set(startDate, timeDiff / (1000 * 60 * 60));
+    }
+  } else {
+    let timeDiffA =
+      moment(eventData.eventStartDateTime).endOf("day").valueOf() -
+      moment(eventData.eventStartDateTime).valueOf();
+
+    let timeDiffB =
+      moment(eventData.eventDateTime).valueOf() -
+      moment(eventData.eventDateTime).startOf("day").valueOf();
+    if (map.has(startDate)) {
+      map.set(startDate, map.get(startDate) + timeDiffA / (1000 * 60 * 60));
+    } else {
+      map.set(startDate, timeDiffA / (1000 * 60 * 60));
+    }
+    if (map.has(endDate)) {
+      map.set(endDate, map.get(endDate) + timeDiffB / (1000 * 60 * 60));
+    } else {
+      map.set(endDate, timeDiffB / (1000 * 60 * 60));
+    }
+  }
+  return map;
+};
+
+function getDates(session) {
+  let result = [];
+  let list = [];
+  if (session == 1) {
+    var currentDate = moment().subtract(7, "d").startOf("day").format();
+    arraylength = 7;
+    current = 0;
+    for (let x = 0; x < arraylength; x++) {
+      const data = {
+        label: "",
+        value: 0
+      };
+      data.label = moment(currentDate).format("D-M-YYYY");
+      currentDate = moment(currentDate).add(1, "d");
+      result.push(data);
+      list.push(data.label);
+    }
+  }
+  return [list, result];
+}
+
+function getWeek() {
+  let result = [];
+  let list = [];
+  var currentWeek = moment().week();
+  arraylength = 4;
+  current = 0;
+  for (let x = arraylength; x >= 0; x--) {
+    const data = {
+      label: currentWeek - x,
+      value: 0
+    };
+    result.push(data);
+    list.push(currentWeek - x);
+  }
+  return [list, result];
+}
+
+function getMonths() {
+  let result = [];
+  let list = [];
+  var currentMonth = moment().month() + 1;
+
+  for (let x = 0; x < 4; x++) {
+    const data = {
+      label: currentMonth - x,
+      value: 0
+    };
+    result.push(data);
+    list.push(currentMonth - x);
+  }
+  return [list, result];
+}
+
+const formatAvarageTimeDate = function (averageTime, session) {
+  if (session == 0) {
+    let result = [];
+    for (const [key, v] of averageTime.entries()) {
+      const data = {
+        label: 1,
+        value: v.value
+      };
+      result.push(data);
+    }
+    return result;
+  } else if (session == 1) {
+    myList = getDates(session);
+    let result = myList[1];
+    for (const [key, v] of averageTime.entries()) {
+      if (myList[0].indexOf(v.date) >= 0) {
+        result[myList[0].indexOf(v.date)].value = v.value;
+      }
+    }
+    return myList[1];
+  } else if (session == 2) {
+    myList = getWeek(session);
+    let result = myList[1];
+    for (const [key, v] of averageTime.entries()) {
+      if (myList[0].indexOf(v._id) >= 0) {
+        result[myList[0].indexOf(v._id)].value = v.value;
+      }
+    }
+    return myList[1];
+  } else if (session == 3) {
+    myList = getMonths(session);
+    let result = myList[1];
+    for (const [key, v] of averageTime.entries()) {
+      if (myList[0].indexOf(v._id) >= 0) {
+        result[myList[0].indexOf(v._id)].value = v.value;
+      }
+    }
+    return myList[1];
+  }
+};
+
 router.get("/runningTime", async (req, res) => {
   try {
     const startDate = moment(+req.query.startDate).format();
@@ -1028,13 +1158,11 @@ router.get("/getAverageLeak", async (req, res) => {
       })
       .catch((err) => console.error(err));
   } else if (req.query.session == 1) {
-    startDate = moment().subtract(90, "d").startOf("day").format();
+    startDate = moment().subtract(7, "d").startOf("day").format();
   } else if (req.query.session == 2) {
     startDate = moment().subtract(30, "d").startOf("day").format();
   } else if (req.query.session == 3) {
     startDate = moment().subtract(90, "d").startOf("day").format();
-  } else if (req.query.session == 4) {
-    startDate = moment().subtract(365, "d").startOf("day").format();
   }
   if (req.query.session != 0) {
     event = await Event.findOne({
@@ -1106,135 +1234,7 @@ router.get("/getAverageLeak", async (req, res) => {
   }
 });
 
-const getAverageHorsPerNight = function (eventData, map) {
-  let startDate = moment(+eventData.eventStartDateTime).format("DD-MM-YYYY");
-  let endDate = moment(+eventData.eventDateTime).format("DD-MM-YYYY");
 
-  if (startDate == endDate) {
-    let timeDiff =
-      moment(eventData.eventDateTime).valueOf() -
-      moment(eventData.eventStartDateTime).valueOf();
-    if (map.has(startDate)) {
-      map.set(startDate, map.get(startDate) + timeDiff / (1000 * 60 * 60));
-    } else {
-      map.set(startDate, timeDiff / (1000 * 60 * 60));
-    }
-  } else {
-    let timeDiffA =
-      moment(eventData.eventStartDateTime).endOf("day").valueOf() -
-      moment(eventData.eventStartDateTime).valueOf();
-
-    let timeDiffB =
-      moment(eventData.eventDateTime).valueOf() -
-      moment(eventData.eventDateTime).startOf("day").valueOf();
-    if (map.has(startDate)) {
-      map.set(startDate, map.get(startDate) + timeDiffA / (1000 * 60 * 60));
-    } else {
-      map.set(startDate, timeDiffA / (1000 * 60 * 60));
-    }
-    if (map.has(endDate)) {
-      map.set(endDate, map.get(endDate) + timeDiffB / (1000 * 60 * 60));
-    } else {
-      map.set(endDate, timeDiffB / (1000 * 60 * 60));
-    }
-  }
-  return map;
-};
-
-function getDates(session) {
-  let result = [];
-  let list = [];
-  if (session == 1) {
-    var currentDate = moment().subtract(7, "d").startOf("day").format();
-    arraylength = 7;
-    current = 0;
-    for (let x = 0; x < arraylength; x++) {
-      const data = {
-        label: "",
-        value: 0
-      };
-      data.label = moment(currentDate).format("D-M-YYYY");
-      currentDate = moment(currentDate).add(1, "d");
-      result.push(data);
-      list.push(data.label);
-    }
-  }
-  return [list, result];
-}
-
-function getWeek() {
-  let result = [];
-  let list = [];
-  var currentWeek = moment().week();
-  arraylength = 4;
-  current = 0;
-  for (let x = arraylength; x >= 0; x--) {
-    const data = {
-      label: currentWeek - x,
-      value: 0
-    };
-    result.push(data);
-    list.push(currentWeek - x);
-  }
-  return [list, result];
-}
-
-function getMonths() {
-  let result = [];
-  let list = [];
-  var currentMonth = moment().month() + 1;
-
-  for (let x = 0; x < 4; x++) {
-    const data = {
-      label: currentMonth - x,
-      value: 0
-    };
-    result.push(data);
-    list.push(currentMonth - x);
-  }
-  return [list, result];
-}
-
-const formatAvarageTimeDate = function (averageTime, session) {
-  if (session == 0) {
-    let result = [];
-    for (const [key, v] of averageTime.entries()) {
-      const data = {
-        label: 1,
-        value: v.value
-      };
-      result.push(data);
-    }
-    return result;
-  } else if (session == 1) {
-    myList = getDates(session);
-    let result = myList[1];
-    for (const [key, v] of averageTime.entries()) {
-      if (myList[0].indexOf(v.date) >= 0) {
-        result[myList[0].indexOf(v.date)].value = v.value;
-      }
-    }
-    return myList[1];
-  } else if (session == 2) {
-    myList = getWeek(session);
-    let result = myList[1];
-    for (const [key, v] of averageTime.entries()) {
-      if (myList[0].indexOf(v._id) >= 0) {
-        result[myList[0].indexOf(v._id)].value = v.value;
-      }
-    }
-    return myList[1];
-  } else if (session == 3) {
-    myList = getMonths(session);
-    let result = myList[1];
-    for (const [key, v] of averageTime.entries()) {
-      if (myList[0].indexOf(v._id) >= 0) {
-        result[myList[0].indexOf(v._id)].value = v.value;
-      }
-    }
-    return myList[1];
-  }
-};
 
 router.get("/reportBySession", async (req, res) => {
   let notUseddays = 0;
