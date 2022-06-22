@@ -4,7 +4,7 @@ const express = require("express");
 var app = express();
 require("dotenv").config(); // Require the dotenv
 
-const mongoUri = 'mongodb://cpapcosmosdb:VeomajElo4ikyp73iZMZ6rlQSKd3VlSMyn0GW55k38bPb5M7w82ZEvM0cQK3tYPxy3IbZ5Z2OPhyfkvqozfKSw==@cpapcosmosdb.mongo.cosmos.azure.com:10255/cpap?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@cpapcosmosdb@'
+const mongoUri = ''
 
 mongoose.connect(mongoUri).then(() => {
   console.log("Database connection Success!");
