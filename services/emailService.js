@@ -3,26 +3,33 @@ const nodeMailer = require("nodemailer");
 const speakeasy = require("speakeasy");
 const emailService = express();
 emailService.use(express.json());
+const emailTemplate = require("./register.js")
+var path = require('path')
+
 
 let map = new Map();
 
+const mailCredentials = {
+  host: "smtp.office365.com",
+  port: 587,
+  secureConnection: false,
+  tls: {
+    ciphers: 'SSLv3'
+  },
+  auth: {
+    user: "appsupport@mytranscend.com",
+    pass: "dr4TlDFHmN",
+  }
+}
+
 module.exports.sendEmail = function (toEmail) {
-  var transporter = nodeMailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: "caprusit.test@gmail.com",
-      pass: "Welcome@01",
-    },
-  });
+  var transporter = nodeMailer.createTransport(mailCredentials);
 
   var mailOptions = {
-    from: "caprusit.test@gmail.com",
+    from: "appsupport@mytranscend.com",
     to: toEmail,
     subject: "Sending Email TO Verify",
-    text:
-      "Dear Sir / Madam, \r\nYour One Time Password(OTP) is :" +
+    text: "Dear Sir / Madam, \r\nYour One Time Password(OTP) is :" +
       this.generateOtp(toEmail) +
       "\r\nYour OTP will expire in 5 min. \r\n\r\n\r\n\r\n\r\nDo not share your OTP with anyone including your Depository Participant (DP).",
   };
@@ -63,7 +70,45 @@ module.exports.verifyOtp = function (token) {
 module.exports.validateOtp = function (email, otp) {
   let expiry = this.verifyOtp(otp);
   if (map.get(email) === otp) {
-      map.delete(email);
-      return true;
+    map.delete(email);
+    return true;
   } else return false;
+};
+
+module.exports.sendEmailTemplate = async function (toEmail, name, callback) {
+  const otp = this.generateOtp(toEmail);
+  const body = emailTemplate.registerEmail(name, otp);
+  var transporter = nodeMailer.createTransport(mailCredentials);
+
+  var mailOptions = {
+    from: "appsupport@mytranscend.com",
+    to: toEmail,
+    subject: "MySleepDash Account Setup One Time Code",
+    html: body,
+    attachment: [{
+      filename: 'transcend_horz_rgb.png',
+      filePath: __dirname + "/transcend_horz_rgb.png"
+    }]
+  };
+
+  return transporter.sendMail(mailOptions, callback);
+
+};
+
+module.exports.resetPasswordTemplate = async function (toEmail, name) {
+  const otp = this.generateOtp(toEmail);
+  const body = emailTemplate.resetPassword(name, otp);
+  var transporter = nodeMailer.createTransport(mailCredentials);
+
+  var mailOptions = {
+    from: "appsupport@mytranscend.com",
+    to: toEmail,
+    subject: "MySleepDash Password Reset",
+    html: body,
+    attachment: [{
+          filename: 'transcend_horz_rgb.png',
+          path: __dirname + "/transcend_horz_rgb.png"
+        }]
+  };
+  return transporter.sendMail(mailOptions);
 };

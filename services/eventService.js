@@ -1,15 +1,34 @@
 const express = require("express");
 const router = require("express").Router();
 const Event = require("./../model/event");
+const Parameter = require("./../model/parameter");
 const eventService = express();
 var hexToBinary = require("hex-to-binary");
 const mongoose = require("mongoose");
-
 const moment = require("moment");
+const emailTemplate = require("./register.js")
+const logger = require('./../logger/customlogger');
+var pdf = require('html-pdf');
 
-eventService.use(express.json());
+const options = {
+  format: 'A4',
+  base: "https://cryptic-caverns-35875.herokuapp.com/"
+}
 
-hexadecimalConversion = function (hexString) {
+const arrayAverage = (array) => array.reduce((a, b) => a + b) / array.length;
+
+eventService.use(express.json({
+  extended: false,
+  limit: '50mb'
+}))
+eventService.use(express.urlencoded({
+  limit: '50mb',
+  extended: false,
+  parameterLimit: 50000
+}))
+
+
+function hexadecimalConversion(hexString) {
   let result = "";
   for (const c of hexString) {
     result = result + hexToBinary(c);
@@ -29,117 +48,189 @@ binaryToHexadecimal = function (binaryStr) {
   return parseInt(binaryStr, 2).toString(10);
 };
 
+async function dateConversion(hexString, email, deviceId) {
+  const array = hexString.match(/.{1,10}/g);
+  var startDateTime;
+  let allEventData = [];
+  for (let x of array) {
+    let twodigitArray = x.match(/.{1,2}/g);
+    if (twodigitArray.length == 5) {
+      let decimal = hexadecimalConversion(twodigitArray[1] + twodigitArray[0]);
+      let decimal2 = hexadecimalConversion(twodigitArray[3] + twodigitArray[2]);
+      let decimal3 = hexadecimalConversion(twodigitArray[4]);
+
+      let yearN = +2000 + +binaryToHexadecimal(decimal.slice(0, 7));
+      let monthN = binaryToHexadecimal(decimal.slice(7, 11));
+      let dateN = binaryToHexadecimal(decimal.slice(11, 16));
+
+      let hourN = binaryToHexadecimal(decimal2.slice(0, 5));
+      let minutesN = binaryToHexadecimal(decimal2.slice(5, 11));
+      let typeN = binaryToHexadecimal(decimal2.slice(11, 16));
+
+      let presssureDate = binaryToHexadecimal(decimal3);
+
+      var dateTime = new Date(yearN, monthN - 1, dateN, hourN, minutesN, 0);
+
+      if (typeN == 1) {
+        startDateTime = dateTime;
+      }
+      let body = {
+        eventDateTime: dateTime,
+        eventType: typeN,
+        subData: presssureDate,
+        eventStartDateTime: startDateTime,
+        email: email,
+        deviceId: deviceId,
+      };
+      allEventData.push(body);
+    } else {
+      throw "Event data format is incorrect ";
+    }
+  }
+  return allEventData;
+};
+
 router.post("/save", async (req, res) => {
+  logger.info("save -- " + req.body.email);
   try {
     let device = req.body.event;
     if (device) {
-      const deletedItem = await Event.deleteMany({
+      await Event.deleteMany({
         email: req.body.email,
         deviceId: req.body.deviceId,
       });
     }
-    device = device.replace(/\s/g, "");
-    device = device.replace(/,/g, "");
-
-    dateConversion(device, req.body.email, req.body.deviceId);
-    res.json({
-      status: "success",
-      result: [],
-      message: "Event Data saved",
+    device = device.replace(/\s/g, "").replace(/,/g, "");
+    const allEventData = await dateConversion(device, req.body.email, req.body.deviceId);
+    Event.insertMany(allEventData).then(
+      res.json({
+        status: "success",
+        result: "",
+        message: "Event Data saved",
+      })
+    ).catch(err => {
+      throw "Event data saving failed";
     });
   } catch (e) {
+    logger.error("save -- " + req.body.email+"--"+ e);
     res.status(500).json({
       status: "Failure",
-      result: "",
+      result: e,
       message: "event saving failed",
     });
   }
 });
 
-dateConversion = function (hexString, email, deviceId) {
-  const array = hexString.match(/.{1,10}/g);
-  var startDateTime;
-  for (let x of array) {
-    let twodigitArray = x.match(/.{1,2}/g);
 
-    let decimal = hexadecimalConversion(twodigitArray[1] + twodigitArray[0]);
-    let decimal2 = hexadecimalConversion(twodigitArray[3] + twodigitArray[2]);
-    let decimal3 = hexadecimalConversion(twodigitArray[4]);
 
-    let yearN = +2000 + +binaryToHexadecimal(decimal.slice(0, 7));
-    let monthN = binaryToHexadecimal(decimal.slice(7, 11));
-    let dateN = binaryToHexadecimal(decimal.slice(11, 16));
-
-    let hourN = binaryToHexadecimal(decimal2.slice(0, 5));
-    let minutesN = binaryToHexadecimal(decimal2.slice(5, 11));
-    let typeN = binaryToHexadecimal(decimal2.slice(11, 16));
-
-    let presssureDate = binaryToHexadecimal(decimal3);
-
-    var dateTime = new Date(yearN, monthN - 1, dateN, hourN, minutesN, 0);
-
-    if (typeN == 1) {
-      startDateTime = dateTime;
+async function getAverageHorsPerNight(eventData, req) {
+  let timseResponse = await Event.aggregate([{
+    $match: {
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      _id: {
+        $gt: mongoose.Types.ObjectId(eventData.id)
+      },
+      eventType: 2
+    },
+  }, {
+    $addFields: {
+      uniqueHour: {
+        $dateToString: {
+          format: "%H",
+          date: "$eventStartDateTime",
+        },
+      },
     }
-    let body = {
-      eventDateTime: dateTime,
-      eventType: typeN,
-      subData: presssureDate,
-      eventStartDateTime: startDateTime,
-      email: email,
-      deviceId: deviceId,
-    };
-
-    let error = Event.create(body).catch((error) =>
-      res.status(500).json({
-        status: "Failure",
-        result: "",
-        message: "event saving failed",
-      })
-    );
-  }
+  }, {
+    $project: {
+      name: 1,
+      customfield: {
+        $switch: {
+          branches: [{
+            case: {
+              $lt: ["$uniqueHour", "12"]
+            },
+            then: {
+              $subtract: ["$eventStartDateTime", 43200000]
+            },
+          }, ],
+          default: "$eventStartDateTime",
+        },
+      },
+      document: "$$ROOT",
+    },
+  }, {
+    $project: {
+      difference: {
+        $divide: [{
+            $subtract: [
+              "$document.eventDateTime",
+              "$document.eventStartDateTime",
+            ],
+          },
+          1000 * 60 * 60,
+        ],
+      },
+      parent: "$$ROOT",
+    }
+  }, {
+    $project: {
+      result: {
+        $round: [{
+          $add: ['$difference', 0.000000001]
+        }, 2]
+      },
+      child: "$$ROOT",
+    }
+  }, {
+    $group: {
+      _id: {
+        year: {
+          $year: "$child.parent.customfield"
+        },
+        month: {
+          $month: "$child.parent.customfield"
+        },
+        day: {
+          $dayOfMonth: "$child.parent.customfield"
+        },
+      },
+      sum: {
+        $sum: "$result"
+      },
+    },
+  }, ]).catch((err) => console.error(err));
+  return timseResponse;
 };
 
-const getAverageHorsPerNight = function (eventData, map) {
-  let startDate = moment(+eventData.eventStartDateTime).format("DD-MM-YYYY");
-  let endDate = moment(+eventData.eventDateTime).format("DD-MM-YYYY");
+async function getMinAndMaxPressure(eventData, req) {
+  let pressureResponse = await Event.aggregate([{
+    $match: {
+      deviceId: req.query.deviceId,
+      email: req.query.email,
 
-  if (startDate == endDate) {
-    let timeDiff =
-      moment(eventData.eventDateTime).valueOf() -
-      moment(eventData.eventStartDateTime).valueOf();
-    if (map.has(startDate)) {
-      map.set(startDate, map.get(startDate) + timeDiff / (1000 * 60 * 60));
-    } else {
-      map.set(startDate, timeDiff / (1000 * 60 * 60));
     }
-  } else {
-    let timeDiffA =
-      moment(eventData.eventStartDateTime).endOf("day").valueOf() -
-      moment(eventData.eventStartDateTime).valueOf();
-
-    let timeDiffB =
-      moment(eventData.eventDateTime).valueOf() -
-      moment(eventData.eventDateTime).startOf("day").valueOf();
-    if (map.has(startDate)) {
-      map.set(startDate, map.get(startDate) + timeDiffA / (1000 * 60 * 60));
-    } else {
-      map.set(startDate, timeDiffA / (1000 * 60 * 60));
+  }, {
+    $group: {
+      "_id": "$eventType",
+      "pressure": {
+        "$max": "$subData"
+      },
+    },
+  }, {
+    $sort: {
+      _id: 1
     }
-    if (map.has(endDate)) {
-      map.set(endDate, map.get(endDate) + timeDiffB / (1000 * 60 * 60));
-    } else {
-      map.set(endDate, timeDiffB / (1000 * 60 * 60));
-    }
-  }
-  return map;
+  }]).catch((err) => console.error(err));
+  return pressureResponse;
 };
 
 function getDates(session) {
   let result = [];
   let list = [];
   if (session == 1) {
-    var currentDate = moment().subtract(7, "d").startOf("day").format();
+    var currentDate = moment().subtract(7, "d").startOf("day").add(12, "h").format();
     arraylength = 7;
     current = 0;
     for (let x = 0; x < arraylength; x++) {
@@ -147,7 +238,7 @@ function getDates(session) {
         label: "",
         value: 0
       };
-      data.label = moment(currentDate).format("D-M-YYYY");
+      data.label = moment(currentDate).format("MM-DD-YYYY");
       currentDate = moment(currentDate).add(1, "d");
       result.push(data);
       list.push(data.label);
@@ -159,32 +250,151 @@ function getDates(session) {
 function getWeek() {
   let result = [];
   let list = [];
-  var currentWeek = moment().week();
   arraylength = 4;
   current = 0;
-  for (let x = arraylength; x >= 0; x--) {
+  for (let x = 1; x <= arraylength; x++) {
     const data = {
-      label: currentWeek - x,
+      label: "Week " + x,
       value: 0
     };
     result.push(data);
-    list.push(currentWeek - x);
+    list.push(x);
   }
   return [list, result];
+}
+
+async function getWeeklyData(deviceId, email) {
+  let result = [];
+  for (let x = 1; x < 5; x++) {
+    let startDate = moment().subtract(7 * x, "d").startOf("day").add(12, "h").format();
+    let endDate = moment().subtract(7 * (x - 1), "d").startOf("day").add(12, "h").format();
+    const averageTime = await Event.aggregate([{
+        $match: {
+          deviceId: deviceId,
+          email: email,
+          eventType: 2,
+          $and: [{
+              eventStartDateTime: {
+                $gte: new Date(startDate)
+              }
+            },
+            {
+              eventStartDateTime: {
+                $lt: new Date(endDate)
+              }
+            }
+          ],
+        }
+      },
+      {
+        $project: {
+          totalMinites: {
+            $divide: [{
+                $subtract: ["$eventDateTime", "$eventStartDateTime"]
+              },
+              1000 * 60 * 60,
+            ],
+          },
+        },
+      }, {
+        $group: {
+          _id: 1,
+          value: {
+            $sum: "$totalMinites"
+          },
+        }
+      }
+    ]).catch((err) => console.error(err));
+    if (averageTime.length > 0) {
+      let totalTime = Math.round(averageTime[0].value * 100) / 100;
+      const data = {
+        label: "Week " + (5 - x),
+        value: totalTime
+      };
+      result.push(data);
+    } else {
+      const data = {
+        label: "Week " + (5 - x),
+        value: 0
+      };
+      result.push(data);
+    }
+
+  }
+  return result;
+}
+
+async function getMonthlyData(deviceId, email) {
+  let result = [];
+  for (let x = 1; x < 4; x++) {
+    let startDate = moment().subtract(30 * x, "d").startOf("day").add(12, "h").format();
+    let endDate = moment().subtract(30 * (x - 1), "d").startOf("day").add(12, "h").format();
+    const averageTime = await Event.aggregate([{
+        $match: {
+          deviceId: deviceId,
+          email: email,
+          eventType: 2,
+          $and: [{
+              eventStartDateTime: {
+                $gte: new Date(startDate)
+              }
+            },
+            {
+              eventStartDateTime: {
+                $lt: new Date(endDate)
+              }
+            }
+          ],
+        }
+      },
+      {
+        $project: {
+          totalMinites: {
+            $divide: [{
+                $subtract: ["$eventDateTime", "$eventStartDateTime"]
+              },
+              1000 * 60 * 60,
+            ],
+          },
+        },
+      }, {
+        $group: {
+          _id: 1,
+          value: {
+            $sum: "$totalMinites"
+          },
+        }
+      }
+    ]).catch((err) => console.error(err));
+    if (averageTime.length > 0) {
+      let totalTime = Math.round(averageTime[0].value * 100) / 100;
+      const data = {
+        label: "Month " + (4 - x),
+        value: totalTime
+      };
+      result.push(data);
+    } else {
+      const data = {
+        label: "Month " + (4 - x),
+        value: 0
+      };
+      result.push(data);
+    }
+
+  }
+  return result;
 }
 
 function getMonths() {
   let result = [];
   let list = [];
-  var currentMonth = moment().month() + 1;
-
-  for (let x = 0; x < 4; x++) {
+  for (let x = 1; x < 4; x++) {
     const data = {
-      label: currentMonth - x,
+      label: "Month " + x,
       value: 0
     };
     result.push(data);
-    list.push(currentMonth - x);
+    list.push(x);
   }
   return [list, result];
 }
@@ -192,38 +402,50 @@ function getMonths() {
 const formatAvarageTimeDate = function (averageTime, session) {
   if (session == 0) {
     let result = [];
-    for (const [key, v] of averageTime.entries()) {
-      const data = {
-        label: 1,
-        value: v.value
-      };
-      result.push(data);
+    const data = {
+      label: moment().subtract(1, "d").format("MM-DD-YYYY"),
+      value: 0
+    };
+    if (averageTime) {
+      for (const [key, v] of averageTime.entries()) {
+        data.label = v.date;
+        data.value = v.value;
+      }
     }
+    result.push(data);
     return result;
   } else if (session == 1) {
     myList = getDates(session);
     let result = myList[1];
-    for (const [key, v] of averageTime.entries()) {
-      if (myList[0].indexOf(v.date) >= 0) {
-        result[myList[0].indexOf(v.date)].value = v.value;
+    if (averageTime) {
+      for (const [key, v] of averageTime.entries()) {
+        const varDate = moment(v.date, "D-M-YYYY").format('MM-DD-YYYY');
+        if (myList[0].indexOf(varDate) >= 0) {
+          result[myList[0].indexOf(varDate)].value = v.value;
+        }
       }
     }
     return myList[1];
   } else if (session == 2) {
     myList = getWeek(session);
     let result = myList[1];
-    for (const [key, v] of averageTime.entries()) {
-      if (myList[0].indexOf(v._id) >= 0) {
-        result[myList[0].indexOf(v._id)].value = v.value;
+    if (averageTime) {
+      for (const [key, v] of averageTime.entries()) {
+        console.log(moment(+v._id).format());
+        if (myList[0].indexOf(v._id) >= 0) {
+          result[myList[0].indexOf(v._id)].value = v.value;
+        }
       }
     }
     return myList[1];
   } else if (session == 3) {
     myList = getMonths(session);
     let result = myList[1];
-    for (const [key, v] of averageTime.entries()) {
-      if (myList[0].indexOf(v._id) >= 0) {
-        result[myList[0].indexOf(v._id)].value = v.value;
+    if (averageTime) {
+      for (const [key, v] of averageTime.entries()) {
+        if (myList[0].indexOf(v._id) >= 0) {
+          result[myList[0].indexOf(v._id)].value = v.value;
+        }
       }
     }
     return myList[1];
@@ -234,7 +456,6 @@ router.get("/runningTime", async (req, res) => {
   try {
     const startDate = moment(+req.query.startDate).format();
     const endDate = moment(+req.query.endDate).format();
-
     const events = await Event.find({
       deviceId: req.query.deviceId,
       email: req.query.email,
@@ -250,7 +471,6 @@ router.get("/runningTime", async (req, res) => {
         },
       ],
     }).catch((err) => console.error(err));
-
     if (events) {
       let lastLeakTtime;
       let totalrunningTime = 0;
@@ -302,83 +522,78 @@ router.get("/runningTime", async (req, res) => {
 });
 
 router.get("/getEventDataBySession", async (req, res) => {
+  logger.info("getEventDataBySession -- " + req.query.email);
   let event, startDate;
   if (req.query.session == 0) {
-    event = await Event.findOne({
-        deviceId: req.query.deviceId,
-          email: req.query.email,
-          eventType: 1,
-        })
-      .sort({
-        _id: -1
-      })
-      .catch((err) => console.error(err));
+    startDate = moment().subtract(1, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 1) {
-    startDate = moment().subtract(7, "d").startOf("day").format();
+    startDate = moment().subtract(7, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 2) {
-    startDate = moment().subtract(30, "d").startOf("day").format();
+    startDate = moment().subtract(33, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 3) {
-    startDate = moment().subtract(90, "d").startOf("day").format();
+    startDate = moment().subtract(90, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 4) {
-    startDate = moment().subtract(365, "d").startOf("day").format();
-  }
-  if (req.query.session != 0) {
-    event = await Event.findOne({
-      deviceId: req.query.deviceId,
-      email: req.query.email,
-      eventType: 1,
-      eventDateTime: {
-        $gte: new Date(startDate),
-      },
-    }).catch((err) => console.error(err));
+    startDate = moment().subtract(365, "d").startOf("day").add(12, "h").format();
   }
   let events = null;
-  if (event)
-    events = await Event.find({
-      deviceId: req.query.deviceId,
-      email: req.query.email,
-      _id: {
-        $gte: event.id
-      },
-    }).catch((err) => console.error(err));
-  if (events) {
+
+  events = await Event.find({
+    deviceId: req.query.deviceId,
+    email: req.query.email,
+    eventType: {
+      $in: [2, 9, 10, 22]
+    },
+    eventStartDateTime: {
+      $gte: new Date(startDate)
+    }
+  }).sort({
+    _id: 1
+  }).catch((err) => {
+    logger.error("getEventDataBySession -- " + req.query.email + err);
+    console.error(err)
+  });
+
+  if (events && events.length > 0) {
     let lastLeakTtime;
+    let lastLeakData;
     let totalrunningTime = 0;
+    let totalAvergaeLeak = 0;
     let averageleak = 0;
     let apneaIndex = 0;
     for (let x of events) {
-      if (x.eventType === 2) {
-        let status =
-          moment(x.eventDateTime).valueOf() -
-          moment(x.eventStartDateTime).valueOf();
-        totalrunningTime += status;
-        const avgtime =
-          (moment(x.eventDateTime).valueOf() - lastLeakTtime) / 1000 / 60;
-        averageleak += avgtime * x.subData;
-        lastLeakTtime = null;
-      } else if (x.eventType === 22) {
+      if (x.eventType === 22) {
         if (!lastLeakTtime) {
-          lastLeakTtime = moment(x.eventStartDateTime).valueOf();
+          lastLeakTtime = moment(x.eventStartDateTime);
         }
-        const avgtime =
-          (moment(x.eventDateTime).valueOf() - lastLeakTtime) / 1000 / 60;
+        const avgtime = moment(x.eventDateTime).diff(lastLeakTtime, 'minutes');
+        lastLeakData = x.subData;
         averageleak += avgtime * x.subData;
-        lastLeakTtime = moment(x.eventDateTime).valueOf();
+        lastLeakTtime = moment(x.eventDateTime);
+      } else if (x.eventType === 2) {
+
+        let status = moment(x.eventDateTime).diff(moment(x.eventStartDateTime), 'minutes');
+        totalrunningTime += status;
+        const avgtime = moment(x.eventDateTime).diff(lastLeakTtime, 'minutes');
+        averageleak += avgtime * lastLeakData;
+        totalAvergaeLeak += averageleak;
+        averageleak = null;
+        lastLeakTtime = null;
       } else if (x.eventType === 10 || x.eventType === 9) {
         apneaIndex++;
       }
     }
 
-    totalrunningTime = totalrunningTime / 1000 / 60;
     if (totalrunningTime > 0) {
-      averageleak = averageleak / totalrunningTime;
-      apneaIndex = apneaIndex / totalrunningTime / 60;
+      totalAvergaeLeak = Math.round((totalAvergaeLeak / totalrunningTime) * 100) / 100;
+      totalrunningTime = totalrunningTime / 60;
+      let totalTime2 = (totalrunningTime > 0) ? Math.round(totalrunningTime * 100) / 100 : 1;
+      apneaIndex = Math.round((apneaIndex / totalTime2) * 100) / 100
     }
     res.json({
       status: "success",
       result: {
         usageHours: totalrunningTime,
-        avgLeak: averageleak,
+        avgLeak: totalAvergaeLeak,
         ahi: apneaIndex,
       },
       message: "Device found",
@@ -400,6 +615,7 @@ router.get("/totalRunningTime", async (req, res) => {
   const timseResponse = await Event.aggregate([{
       $match: {
         deviceId: req.query.deviceId,
+        email: req.query.email,
         eventType: 2,
       },
     },
@@ -407,8 +623,8 @@ router.get("/totalRunningTime", async (req, res) => {
       $project: {
         totalMinites: {
           $divide: [{
-                $subtract: ["$eventDateTime", "$eventStartDateTime"]
-              },
+              $subtract: ["$eventDateTime", "$eventStartDateTime"]
+            },
             1000 * 60,
           ],
         },
@@ -436,52 +652,37 @@ router.get("/statisticsBySession", async (req, res) => {
   let event, startDate;
   if (req.query.session == 0) {
     notUseddays = 1;
-    event = await Event.findOne({
-        deviceId: req.query.deviceId,
-          email: req.query.email,
-          eventType: 1,
-        })
-      .sort({
-        _id: -1
-      })
-      .catch((err) => console.error(err));
+    startDate = moment().subtract(1, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 1) {
     notUseddays = 7;
-    startDate = moment().subtract(7, "d").startOf("day").format();
+    startDate = moment().subtract(7, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 2) {
     notUseddays = 30;
-    startDate = moment().subtract(30, "d").startOf("day").format();
+    startDate = moment().subtract(30, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 3) {
     notUseddays = 90;
-    startDate = moment().subtract(90, "d").startOf("day").format();
+    startDate = moment().subtract(90, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 4) {
     notUseddays = 365;
-    startDate = moment().subtract(365, "d").startOf("day").format();
-  }
-  if (req.query.session != 0) {
-    event = await Event.findOne({
-      deviceId: req.query.deviceId,
-      email: req.query.email,
-      eventType: 1,
-      eventDateTime: {
-        $gte: new Date(startDate),
-      },
-    }).catch((err) => console.error(err));
+    startDate = moment().subtract(365, "d").startOf("day").add(12, "h").format();
   }
   let eventList = null;
-  if (event)
-    eventList = await Event.find({
+
+  eventList = await Event.find({
       deviceId: req.query.deviceId,
       email: req.query.email,
-      _id: {
-        $gte: event.id
+      eventType: {
+        $in: [1, 22, 24, 2]
       },
+      eventStartDateTime: {
+        $gte: new Date(startDate)
+      }
     })
     .sort({
       _id: 1
-    })
-      .catch((err) => console.error(err));
-  if (eventList) {
+    }).catch((err) => console.error(err));
+
+  if (eventList && eventList.length > 0) {
     let lastLeakTtime;
     let averageleak = 0;
     let meadianLeak = [];
@@ -526,7 +727,7 @@ router.get("/statisticsBySession", async (req, res) => {
           avgPressureArry.push(avgPressure * x.subData);
       }
     }
-
+    event = eventList[0];
     const deviceRunningTime = await Event.aggregate([{
         $match: {
           _id: {
@@ -541,9 +742,9 @@ router.get("/statisticsBySession", async (req, res) => {
         $project: {
           totalMinites: {
             $divide: [{
-                  $subtract: ["$eventDateTime", "$eventStartDateTime"]
-                },
-                1000 * 60,
+                $subtract: ["$eventDateTime", "$eventStartDateTime"]
+              },
+              1000 * 60,
             ],
           },
         },
@@ -573,14 +774,14 @@ router.get("/statisticsBySession", async (req, res) => {
       {
         $project: {
           year: {
-              $year: "$eventDateTime"
-            },
-            month: {
-              $month: "$eventDateTime"
-            },
-            day: {
-              $dayOfMonth: "$eventDateTime"
-            },
+            $year: "$eventDateTime"
+          },
+          month: {
+            $month: "$eventDateTime"
+          },
+          day: {
+            $dayOfMonth: "$eventDateTime"
+          },
         },
       },
       {
@@ -592,8 +793,8 @@ router.get("/statisticsBySession", async (req, res) => {
               month: "$month",
               day: "$day"
             },
-            },
-            },
+          },
+        },
       }, {
         $sort: {
           distinctDate: 1
@@ -630,15 +831,15 @@ router.get("/statisticsBySession", async (req, res) => {
               $year: "$document.eventDateTime"
             },
             month: {
-                $month: "$document.eventDateTime"
-              },
-              day: {
-                $dayOfMonth: "$document.eventDateTime"
-              },
+              $month: "$document.eventDateTime"
             },
-            timeSum: {
-              $sum: "$totalHours"
+            day: {
+              $dayOfMonth: "$document.eventDateTime"
             },
+          },
+          timeSum: {
+            $sum: "$totalHours"
+          },
         },
       },
     ]);
@@ -647,12 +848,6 @@ router.get("/statisticsBySession", async (req, res) => {
       fourToSix = 0,
       sixToEight = 0,
       eightPlus = 0;
-    const mid = Math.floor(runningtimByDays.length / 2);
-    const median =
-      runningtimByDays.length % 2 !== 0 ?
-        runningtimByDays[mid].timeSum :
-        (runningtimByDays[mid - 1].timeSum + runningtimByDays[mid].timeSum) /
-        2;
 
     avgPressureArry.sort(function (a, b) {
       return a - b;
@@ -660,11 +855,7 @@ router.get("/statisticsBySession", async (req, res) => {
 
     const percentile90Pressue = percentile(avgPressureArry, 90);
     const percentile95Pressue = percentile(avgPressureArry, 95);
-    const m = Math.floor(meadianLeak.length / 2);
-    const mLeakValue =
-      meadianLeak.length % 2 !== 0 ?
-        meadianLeak[m] :
-        (meadianLeak[m - 1] + meadianLeak[m]) / 2;
+
     for (let y of runningtimByDays) {
       if (y.timeSum > 4 && y.timeSum <= 6) {
         fourToSix++;
@@ -690,11 +881,11 @@ router.get("/statisticsBySession", async (req, res) => {
     let response = {
       usage: totalRunningTime,
       averageHoursPerNight: totalRunningTime / (noofDays * 60),
-      medianHoursPerNight: median,
+      medianHoursPerNight: 0,
       noofDays: noofDays,
       notUsed: notUseddays,
       averageleak: averageleak,
-      meadianLeak: mLeakValue,
+      meadianLeak: 0,
       greaterThanFour: greaterThanFour,
       fourToSix: fourToSix,
       sixToEight: sixToEight,
@@ -721,33 +912,25 @@ router.get("/statisticsBySession", async (req, res) => {
 
 router.get("/getAverageTime", async (req, res) => {
   let event, startDate;
+  let result;
   if (req.query.session == 0) {
-    event = await Event.findOne({
-        deviceId: req.query.deviceId,
-        email: req.query.email,
-        eventType: 1,
-      })
-      .sort({
-        _id: -1
-      })
-      .catch((err) => console.error(err));
+    startDate = moment().subtract(1, "d").startOf("day").add(12, 'h').format();
   } else if (req.query.session == 1) {
-    startDate = moment().subtract(7, "d").startOf("day").add(moment.duration(12, "hours")).format();
+    startDate = moment().subtract(7, "d").startOf("day").add(12, 'h').format();
   } else if (req.query.session == 2) {
-    startDate = moment().subtract(30, "d").startOf("day").add(moment.duration(12, "hours")).format();
+    startDate = moment().subtract(30, "d").startOf("day").add(12, 'h').format();
   } else if (req.query.session == 3) {
-    startDate = moment().subtract(90, "d").startOf("day").add(moment.duration(12, "hours")).format();
+    startDate = moment().subtract(90, "d").startOf("day").add(12, 'h').format();
   }
-  if (req.query.session != 0) {
-    event = await Event.findOne({
-      deviceId: req.query.deviceId,
-      email: req.query.email,
-      eventType: 1,
-      eventDateTime: {
-        $gte: new Date(startDate),
-      },
-    }).catch((err) => console.error(err));
-  }
+
+  event = await Event.findOne({
+    deviceId: req.query.deviceId,
+    email: req.query.email,
+    eventType: 1,
+    eventStartDateTime: {
+      $gte: new Date(startDate),
+    },
+  }).catch((err) => console.error(err));
 
   if (event) {
     let averageTime = {};
@@ -800,7 +983,7 @@ router.get("/getAverageTime", async (req, res) => {
                     "$document.eventStartDateTime",
                   ],
                 },
-                60 * 1000,
+                1000 * 60 * 60,
               ],
             },
             child: "$$ROOT",
@@ -844,109 +1027,22 @@ router.get("/getAverageTime", async (req, res) => {
           },
         },
       ]);
+      result = formatAvarageTimeDate(averageTime, req.query.session);
     } else if (req.query.session == 2) {
-      averageTime = await Event.aggregate([{
-          $match: {
-            _id: {
-              $gte: mongoose.Types.ObjectId(event.id)
-            },
-            deviceId: req.query.deviceId,
-            email: req.query.email,
-            eventType: 2,
-          },
-        },
-        {
-          $project: {
-            totalMinites: {
-              $divide: [{
-                  $subtract: ["$eventDateTime", "$eventStartDateTime"]
-                },
-                1000 * 60,
-              ],
-            },
-            document: "$$ROOT",
-          },
-        },
-        {
-          $group: {
-            _id: {
-              $week: "$document.eventDateTime",
-            },
-            value: {
-              $sum: "$totalMinites"
-            },
-          },
-        },
-        {
-          $project: {
-            label: "$_id.week",
-            value: "$value",
-          },
-        },
-        {
-          $sort: {
-            _id: 1,
-          },
-        },
-      ]);
+      result = await getWeeklyData(req.query.deviceId, req.query.email)
     } else if (req.query.session == 3) {
-      averageTime = await Event.aggregate([{
-          $match: {
-            _id: {
-              $gte: mongoose.Types.ObjectId(event.id)
-            },
-            deviceId: req.query.deviceId,
-            email: req.query.email,
-            eventType: 2,
-          },
-        },
-        {
-          $project: {
-            totalMinites: {
-              $divide: [{
-                  $subtract: ["$eventDateTime", "$eventStartDateTime"]
-                },
-                1000 * 60,
-              ],
-            },
-            document: "$$ROOT",
-          },
-        },
-        {
-          $group: {
-            _id: {
-              $month: "$document.eventDateTime",
-            },
-            value: {
-              $sum: "$totalMinites"
-            },
-          },
-        },
-        {
-          $project: {
-            value: "$value",
-          },
-        },
-        {
-          $sort: {
-            _id: 1,
-          },
-        },
-      ]);
+      result = await getMonthlyData(req.query.deviceId, req.query.email)
     }
-
-    const result = formatAvarageTimeDate(averageTime, req.query.session);
     res.json({
       status: "success",
-      averageTime: result,
+      result: result,
       message: "Device found",
     });
   } else {
+    result = formatAvarageTimeDate(null, req.query.session);
     res.json({
       status: "success",
-      result: {
-        averageTime: 0,
-      },
+      result: result,
       message: "No Data found",
     });
   }
@@ -955,21 +1051,13 @@ router.get("/getAverageTime", async (req, res) => {
 router.get("/getAverageAHI", async (req, res) => {
   let event, startDate;
   if (req.query.session == 0) {
-    event = await Event.findOne({
-        deviceId: req.query.deviceId,
-        email: req.query.email,
-        eventType: 1,
-      })
-      .sort({
-        _id: -1
-      })
-      .catch((err) => console.error(err));
+    startDate = moment().subtract(1, "d").startOf("day").add(12, 'h').format();
   } else if (req.query.session == 1) {
-    startDate = moment().subtract(7, "d").startOf("day").add(moment.duration(12, "hours")).format();
+    startDate = moment().subtract(7, "d").startOf("day").add(12, 'h').format();
   } else if (req.query.session == 2) {
-    startDate = moment().subtract(30, "d").startOf("day").add(moment.duration(12, "hours")).format();
+    startDate = moment().subtract(30, "d").startOf("day").add(12, 'h').format();
   } else if (req.query.session == 3) {
-    startDate = moment().subtract(90, "d").startOf("day").add(moment.duration(12, "hours")).format();
+    startDate = moment().subtract(90, "d").startOf("day").add(12, 'h').format();
   }
   if (req.query.session != 0) {
     event = await Event.findOne({
@@ -1234,192 +1322,445 @@ router.get("/getAverageLeak", async (req, res) => {
   }
 });
 
-
-
 router.get("/reportBySession", async (req, res) => {
+  logger.info("reportBySession -- " + req.query.email);
   let notUseddays = 0;
+  let datesOfReport;
   let event, startDate;
   if (req.query.session == 0) {
     notUseddays = 1;
-    event = await Event.findOne({
-        deviceId: req.query.deviceId,
-        email: req.query.email,
-        eventType: 1,
-      })
-      .sort({
-        _id: -1
-      })
-      .catch((err) => console.error(err));
+    startDate = moment().subtract(1, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 1) {
     notUseddays = 7;
-    startDate = moment().subtract(7, "d").startOf("day").format();
+    startDate = moment().subtract(7, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 2) {
     notUseddays = 30;
-    startDate = moment().subtract(30, "d").startOf("day").format();
+    startDate = moment().subtract(33, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 3) {
     notUseddays = 90;
-    startDate = moment().subtract(90, "d").startOf("day").format();
+    startDate = moment().subtract(90, "d").startOf("day").add(12, "h").format();
   } else if (req.query.session == 4) {
     notUseddays = 365;
-    startDate = moment().subtract(365, "d").startOf("day").format();
-  }
-  if (req.query.session != 0) {
-    event = await Event.findOne({
-      deviceId: req.query.deviceId,
-      email: req.query.email,
-      eventType: 1,
-      eventDateTime: {
-        $gte: new Date(startDate),
-      },
-    }).catch((err) => console.error(err));
+    startDate = moment().subtract(365, "d").startOf("day").add(12, "h").format();
   }
   let eventList = null;
-  if (event) {
-    eventList = await Event.find({
-        deviceId: req.query.deviceId,
-        email: req.query.email,
-        eventType: {
-          $in: [1, 24, 2]
-        },
-        _id: {
-          $gte: event.id
-        },
-      })
-      .sort({
-        _id: 1
-      })
-      .catch((err) => console.error(err));
-  }
 
-  let subData;
-  let lastPressureTtime;
-  let eventPressure = 0;
-  let averagePressure = 0;
-  let changeEventPresent = false;
-  let avgPArray = [];
-  let pressureCount = 0;
-  let map = new Map();
-  for (let x of eventList) {
-    if (x.eventType == 1) {
-      subData = x.subData / 10;
-    } else if (x.eventType == 24) {
-      changeEventPresent = true;
-      if (!lastPressureTtime) {
-        lastPressureTtime = moment(x.eventStartDateTime).valueOf();
+  datesOfReport = moment(startDate).format("MM-DD-YYYY") + " to " + moment().format("MM-DD-YYYY");
+  eventList = await Event.find({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: {
+        $in: [1, 11, 22, 23, 24, 25, 26, 27, 2]
+      },
+      eventStartDateTime: {
+        $gte: new Date(startDate)
       }
-      const avgPressure =
-        (moment(x.eventDateTime).valueOf() - lastPressureTtime) / 1000 / 60;
-      eventPressure += avgPressure * subData;
-      lastPressureTtime = moment(x.eventDateTime).valueOf();
-      subData = x.subData / 10;
-    } else if (x.eventType == 2) {
-      if (changeEventPresent) {
-        changeEventPresent = false;
-        const avgPressure =
-          (moment(x.eventDateTime).valueOf() - lastPressureTtime) / 1000 / 60;
+    })
+    .sort({
+      _id: 1
+    })
+    .catch((err) => {
+      logger.error("reportBySession -- " + req.query.email + err);
+      console.error(err)
+    });
+
+  if (eventList && eventList.length > 0) {
+    let subData;
+    let lastPressureTtime;
+    let lastLeakTtime;
+    let eventPressure = 0;
+    let eventAvgLeak = 0;
+    let averagePressure = 0;
+    let averageLeak = 0;
+    let lastLeakEventData = 0;
+    let avgLeakEventArray = [];
+    let avgPArray = [];
+
+    for (let x of eventList) {
+      if (x.eventType == 1) {
+        subData = x.subData / 10;
+        avgLeakEventArray.push(x.subData);
+        avgPArray.push(x.subData);
+      } else if (x.eventType == 22) {
+        if (!lastLeakTtime) {
+          lastLeakTtime = moment(x.eventStartDateTime);
+        }
+        const avgLeak = moment(x.eventDateTime).diff(lastLeakTtime, 'minutes');
+        eventAvgLeak += avgLeak * x.subData;
+        lastLeakTtime = x.eventDateTime;
+        lastLeakEventData = x.subData;
+        avgLeakEventArray.push(x.subData);
+      } else if (x.eventType == 11 || x.eventType == 23 || x.eventType == 24 || x.eventType == 25 || x.eventType == 26 || x.eventType == 27) {
+        if (!lastPressureTtime) {
+          lastPressureTtime = moment(x.eventStartDateTime);
+        }
+        const avgPressure = moment(x.eventDateTime).diff(lastPressureTtime, 'minutes')
         eventPressure += avgPressure * subData;
-        pressureCount++;
-        let sesionp =
-          eventPressure /
-          ((moment(x.eventDateTime).valueOf() -
-              moment(x.eventStartDateTime).valueOf()) /
-            1000 /
-            60);
-        (sesionp = Math.round(sesionp * 100) / 100), avgPArray.push(sesionp);
-        averagePressure += sesionp;
+        lastPressureTtime = x.eventDateTime;
+        subData = x.subData / 10;
+        avgPArray.push(x.subData);
+      } else if (x.eventType == 2) {
+        if (!lastPressureTtime) {
+          lastPressureTtime = moment(x.eventStartDateTime);
+        }
+        const avgPressure = moment(x.eventDateTime).diff(lastPressureTtime, 'minutes');
+
+        eventPressure += avgPressure * subData;
+        avgPArray.push(x.subData);
+        averagePressure += eventPressure;
         lastPressureTtime = null;
         subData = null;
         eventPressure = 0;
+        avgLeakEventArray.push(x.subData);
+        const avgLeak = moment.duration(moment(x.eventDateTime).diff(lastLeakTtime)).minutes();
+        eventAvgLeak += avgLeak * lastLeakEventData;
+        averageLeak += eventAvgLeak;
+        lastLeakTtime = null;
+        eventAvgLeak = 0;
       }
-      getAverageHorsPerNight(x, map);
+    }
+
+    if (event == null || event == 'undefined')
+      event = eventList[0];
+    const dailyList = await getAverageHorsPerNight(event, req);
+
+    const deviceParams = await Parameter.findOne({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+    }).lean();
+
+    let sum = 0,
+      greaterThanFour = 0,
+      greaterThanSix = 0;
+    dailyList.forEach((v) => {
+      sum += v.sum;
+      if (v.sum > 4) {
+        greaterThanFour++;
+      }
+      if (v.sum > 6) {
+        greaterThanSix++;
+      }
+    });
+    avgLeakEventArray.sort(function (a, b) {
+      return a - b;
+    });
+    avgPArray.sort(function (a, b) {
+      return a - b;
+    });
+
+    let nintyFivePercentilePressure = percentile(avgPArray, 95);
+    let nintyFivePercentileLeak = percentile(avgLeakEventArray, 95);
+
+    const apneaArray = await Event.aggregate([{
+        $match: {
+          _id: {
+            $gte: mongoose.Types.ObjectId(event.id)
+          },
+          deviceId: req.query.deviceId,
+          email: req.query.email,
+          eventType: 9,
+        },
+      },
+      {
+        $count: "apneaCount",
+      },
+    ]);
+    let apnea = apneaArray.length > 0 ? apneaArray[0].apneaCount : 0;
+    const hypopneaArray = await Event.aggregate([{
+        $match: {
+          _id: {
+            $gte: mongoose.Types.ObjectId(event.id)
+          },
+          deviceId: req.query.deviceId,
+          email: req.query.email,
+          eventType: 10,
+        },
+      },
+      {
+        $count: "hypopneaCount",
+      },
+    ]);
+    let hypopnea = hypopneaArray.length > 0 ? hypopneaArray[0].hypopneaCount : 0;
+    let totalTime = (sum > 0) ? Math.round(sum * 100) / 100 : 0;
+    let totalTime2 = (sum > 0) ? Math.round(sum * 100) / 100 : 1;
+    let noofDays = dailyList.length;
+    let response = {
+      datesOfReport: datesOfReport,
+      usage: totalTime,
+      noofDays: noofDays,
+      notUsed: notUseddays - noofDays,
+      averageHoursPerNight: Math.round((totalTime / noofDays) * 100) / 100,
+      greaterThanFour: greaterThanFour,
+      greaterThanSix: greaterThanSix,
+      apnea: Math.round((apnea / totalTime2) * 100) / 100,
+      hypopnea: Math.round((hypopnea / totalTime2) * 100) / 100,
+      AHI: Math.round(((apnea + hypopnea) / totalTime2) * 100) / 100,
+      minPressure: deviceParams.minimumPressure,
+      maxPressure: deviceParams.maximumPressure,
+      averagePressure: Math.round((averagePressure / (totalTime2 * 60)) * 100) / 100,
+      nintyFivePercentilePressure: nintyFivePercentilePressure / 10,
+      averageLeak: Math.round((averageLeak / (totalTime2 * 60)) * 100) / 100,
+      nintyFivePercentileLeak: nintyFivePercentileLeak,
+    };
+
+    res.json({
+      status: "success",
+      result: response,
+      message: "Event Data found",
+    });
+  } else {
+    res.json({
+      status: "success",
+      result: {
+        datesOfReport: datesOfReport,
+        usage: 0,
+        noofDays: 0,
+        notUsed: 0,
+        averageHoursPerNight: 0,
+        greaterThanFour: 0,
+        greaterThanSix: 0,
+        apnea: 0,
+        hypopnea: 0,
+        AHI: 0,
+        minPressure: 0,
+        maxPressure: 0,
+        averagePressure: 0,
+        nintyFivePercentilePressure: 0,
+        averageLeak: 0,
+        nintyFivePercentileLeak: 0,
+      },
+      message: "No Event Data found",
+    });
+  }
+});
+
+router.get("/genaratePdf", async (req, res) => {
+
+  let notUseddays = 0;
+  let datesOfReport;
+  let event, startDate, response;
+  if (req.query.session == 0) {
+    notUseddays = 1;
+    startDate = moment().subtract(1, "d").startOf("day").add(12, "h").format();
+  } else if (req.query.session == 1) {
+    notUseddays = 7;
+    startDate = moment().subtract(7, "d").startOf("day").add(12, "h").format();
+  } else if (req.query.session == 2) {
+    notUseddays = 30;
+    startDate = moment().subtract(30, "d").startOf("day").add(12, "h").format();
+  } else if (req.query.session == 3) {
+    notUseddays = 90;
+    startDate = moment().subtract(90, "d").startOf("day").add(12, "h").format();
+  } else if (req.query.session == 4) {
+    notUseddays = 365;
+    startDate = moment().subtract(365, "d").startOf("day").add(12, "h").format();
+  }
+  let eventList = null;
+
+  datesOfReport = moment(startDate).format("MM-DD-YYYY") + " to " + moment().format("MM-DD-YYYY");
+  eventList = await Event.find({
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      eventType: {
+        $in: [1, 11, 22, 23, 24, 25, 26, 27, 2]
+      },
+      eventStartDateTime: {
+        $gte: new Date(startDate)
+      }
+    })
+    .sort({
+      _id: 1
+    })
+    .catch((err) => console.error(err));
+
+  const params = await Parameter.findOne({
+    deviceId: req.query.deviceId,
+    email: req.query.email,
+  }).lean();
+  if (eventList && eventList.length > 0) {
+    let subData;
+    let lastPressureTtime;
+    let lastLeakTtime;
+    let eventPressure = 0;
+    let eventAvgLeak = 0;
+    let averagePressure = 0;
+    let averageLeak = 0;
+    let lastLeakEventData = 0;
+    let avgLeakEventArray = [];
+    let avgPArray = [];
+    for (let x of eventList) {
+      if (x.eventType == 1) {
+        subData = x.subData / 10;
+        avgLeakEventArray.push(x.subData);
+        avgPArray.push(x.subData);
+      } else if (x.eventType == 22) {
+        if (!lastLeakTtime) {
+          lastLeakTtime = moment(x.eventStartDateTime);
+        }
+        const avgLeak = moment(x.eventDateTime).diff(lastLeakTtime, 'minutes');
+        eventAvgLeak += avgLeak * x.subData;
+        lastLeakTtime = x.eventDateTime;
+        lastLeakEventData = x.subData;
+        avgLeakEventArray.push(x.subData);
+      } else if (x.eventType == 11 || x.eventType == 23 || x.eventType == 24 || x.eventType == 25 || x.eventType == 26 || x.eventType == 27) {
+        if (!lastPressureTtime) {
+          lastPressureTtime = moment(x.eventStartDateTime);
+        }
+        const avgPressure = moment(x.eventDateTime).diff(lastPressureTtime, 'minutes')
+        eventPressure += avgPressure * subData;
+        lastPressureTtime = x.eventDateTime;
+        subData = x.subData / 10;
+        avgPArray.push(x.subData);
+      } else if (x.eventType == 2) {
+        if (!lastPressureTtime) {
+          lastPressureTtime = moment(x.eventStartDateTime);
+        }
+        const avgPressure = moment(x.eventDateTime).diff(lastPressureTtime, 'minutes');
+        eventPressure += avgPressure * subData;
+        avgPArray.push(x.subData);
+        averagePressure += eventPressure;
+        lastPressureTtime = null;
+        subData = null;
+        eventPressure = 0;
+        pressureChangeEventExists = false;
+        avgLeakEventArray.push(x.subData);
+        const avgLeak = moment.duration(moment(x.eventDateTime).diff(lastLeakTtime)).minutes();
+        eventAvgLeak += avgLeak * lastLeakEventData;
+        averageLeak += eventAvgLeak;
+        lastLeakTtime = null;
+        eventAvgLeak = 0;
+      }
+    }
+
+    if (event == null || event == 'undefined')
+      event = eventList[0];
+    const dailyList = await getAverageHorsPerNight(event, req);
+
+    let sum = 0,
+      greaterThanFour = 0,
+      greaterThanSix = 0;
+    dailyList.forEach((v) => {
+      sum += v.sum;
+      if (v.sum > 4) {
+        greaterThanFour++;
+      }
+      if (v.sum > 6) {
+        greaterThanSix++;
+      }
+    });
+    avgLeakEventArray.sort(function (a, b) {
+      return a - b;
+    });
+    avgPArray.sort(function (a, b) {
+      return a - b;
+    });
+
+    let nintyFivePercentilePressure = percentile(avgPArray, 95);
+    let nintyFivePercentileLeak = percentile(avgLeakEventArray, 95);
+
+    const apneaArray = await Event.aggregate([{
+        $match: {
+          _id: {
+            $gte: mongoose.Types.ObjectId(event.id)
+          },
+          deviceId: req.query.deviceId,
+          email: req.query.email,
+          eventType: 9,
+        },
+      },
+      {
+        $count: "apneaCount",
+      },
+    ]);
+    let apnea = apneaArray.length > 0 ? apneaArray[0].apneaCount : 0;
+    const hypopneaArray = await Event.aggregate([{
+        $match: {
+          _id: {
+            $gte: mongoose.Types.ObjectId(event.id)
+          },
+          deviceId: req.query.deviceId,
+          email: req.query.email,
+          eventType: 10,
+        },
+      },
+      {
+        $count: "hypopneaCount",
+      },
+    ]);
+    let hypopnea = hypopneaArray.length > 0 ? hypopneaArray[0].hypopneaCount : 0;
+    let totalTime = (sum > 0) ? Math.round(sum * 100) / 100 : 0;
+    let totalTime2 = (sum > 0) ? Math.round(sum * 100) / 100 : 1;
+    let noofDays = dailyList.length;
+    response = {
+      session: notUseddays == 0 ? "Last Session" : notUseddays + " Days",
+      datesOfReport: datesOfReport,
+      usage: totalTime,
+      noofDays: noofDays + "of " + notUseddays + " Days (" + Math.round((noofDays * 100 / notUseddays) * 100) / 100 + "%)",
+      days: notUseddays,
+      averageHoursPerNight: Math.round((totalTime / noofDays) * 100) / 100,
+      greaterThanFour: greaterThanFour + "of " + notUseddays + " Days (" + Math.round((greaterThanFour * 100 / notUseddays) * 100) / 100 + "%)",
+      greaterThanSix: greaterThanSix + "of " + notUseddays + " Days (" + Math.round((greaterThanSix * 100 / notUseddays) * 100) / 100 + "%)",
+      apnea: Math.round((apnea / totalTime2) * 100) / 100,
+      hypopnea: Math.round((hypopnea / totalTime2) * 100) / 100,
+      AHI: Math.round(((apnea + hypopnea) / totalTime2) * 100) / 100,
+      minPressure: params.minimumPressure,
+      maxPressure: params.maximumPressure,
+      averagePressure: Math.round((averagePressure / (totalTime2 * 60)) * 100) / 100,
+      nintyFivePercentilePressure: nintyFivePercentilePressure / 10,
+      averageLeak: Math.round((averageLeak / (totalTime2 * 60)) * 100) / 100,
+      nintyFivePercentileLeak: nintyFivePercentileLeak,
+      name: req.query.name,
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      startPressure: params.startingPressure,
+      risePressure: params.startingRampPressure,
+      riseDuration: params.rampDuration,
+      air: params.EZEX,
+    };
+
+  } else {
+    response = {
+      session: notUseddays == 0 ? "Last Session" : notUseddays + " Days",
+      datesOfReport: datesOfReport,
+      usage: 0,
+      noofDays: 0,
+      notUsed: 0,
+      averageHoursPerNight: 0,
+      greaterThanFour: 0,
+      greaterThanSix: 0,
+      apnea: 0,
+      hypopnea: 0,
+      AHI: 0,
+      minPressure: params != null ? params.minimumPressure : 0,
+      maxPressure: params != null ? params.maximumPressure : 0,
+      averagePressure: 0,
+      nintyFivePercentilePressure: 0,
+      averageLeak: 0,
+      nintyFivePercentileLeak: 0,
+      name: req.query.name,
+      deviceId: req.query.deviceId,
+      email: req.query.email,
+      startPressure: params != null ? params.startingPressure : 0,
+      risePressure: params != null ? params.startingRampPressure : 0,
+      riseDuration: params != null ? params.rampDuration : 0,
+      air: params != null ? params.EZEX : 0,
     }
   }
-  map.forEach((k, v) => {
-    console.log(k, "===", v);
-  });
-  let sum = 0,
-    greaterThanFour = 0,
-    fourToSix = 0,
-    sixToEight = 0,
-    eightPlus = 0;
-  map.forEach((v) => {
-    sum += v;
-    if (v > 4 && v <= 6) {
-      fourToSix++;
-      greaterThanFour++;
-    } else if (v > 6 && v <= 8) {
-      sixToEight++;
-      greaterThanFour++;
-    } else if (v > 8) {
-      eightPlus++;
-      greaterThanFour++;
+  let htmlStr = emailTemplate.pdfreport(response);
+  let name = req.query.name.replace(/ /g, '');
+  pdf.create(htmlStr, options).toFile(name + '.pdf', function (err, res2) {
+    if (err) {
+      res.status(500).send({
+        status: "failure"
+      });
     }
-  });
-
-  avgPArray.sort(function (a, b) {
-    return a - b;
-  });
-  let nintyFivePercentilePressure = percentile(avgPArray, 95);
-
-  const apneaArray = await Event.aggregate([{
-      $match: {
-        _id: {
-          $gte: mongoose.Types.ObjectId(event.id)
-        },
-        deviceId: req.query.deviceId,
-        email: req.query.email,
-        eventType: 9,
-      },
-    },
-    {
-      $count: "apneaCount",
-    },
-  ]);
-  let apnea = apneaArray.length > 0 ? apneaArray[0].apneaCount : 0;
-  const hypopneaArray = await Event.aggregate([{
-      $match: {
-        _id: {
-          $gte: mongoose.Types.ObjectId(event.id)
-        },
-        deviceId: req.query.deviceId,
-        email: req.query.email,
-        eventType: 10,
-      },
-    },
-    {
-      $count: "hypopneaCount",
-    },
-  ]);
-  let hypopnea = hypopneaArray.length > 0 ? hypopneaArray[0].hypopneaCount : 0;
-  let totalTime = Math.round(sum * 100) / 100;
-  let noofDays = map.size;
-  let response = {
-    usage: totalTime,
-    notUsed: notUseddays - noofDays,
-    averageHoursPerNight: Math.round((totalTime / noofDays) * 100) / 100,
-    greaterThanFour: greaterThanFour,
-    fourToSix: fourToSix,
-    sixToEight: sixToEight,
-    eightPlus: eightPlus,
-    apnea: Math.round((apnea / totalTime) * 100) / 100,
-    hypopnea: Math.round((hypopnea / totalTime) * 100) / 100,
-    AHI: Math.round(((apnea + hypopnea) / totalTime) * 100) / 100,
-    averagePressure: Math.round((averagePressure / pressureCount) * 100) / 100,
-    nintyFivePercentilePressure: nintyFivePercentilePressure,
-  };
-
-  res.json({
-    status: "success",
-    result: response,
-    message: "Event Data found",
-  });
-  // } else {
-  //   res.json({
-  //     status: "success",
-  //     result: 0,
-  //     message: "No Event Data found",
-  //   });
-  // }
+    res.send({
+      status: "success",
+      result: name + ".pdf"
+    });
+  })
 });
+
+
 
 module.exports = router;

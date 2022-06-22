@@ -21,7 +21,9 @@ router.post("/save", async (req, res) => {
           message: "You've successfully created Product",
         })
       )
-      .catch((error) => res.status(500).json({ msg: error }));
+      .catch((error) => res.status(500).json({
+        msg: error
+      }));
   }
 });
 
@@ -46,27 +48,39 @@ router.delete("/delete", async (req, res) => {
 });
 
 router.get("/getProduct", async (req, res) => {
-  const modelNo = req.query.serialNumber.charAt(4);
-  const productExists = await Product.findOne({ modelNo: modelNo }).catch(
-    (err) => console.error(err)
-  );
-  if (productExists) {
-    res.json({
-      status: "success",
-      result: {
-        name: productExists.name,
-        image: "/images/" + productExists.image,
-      },
-      message: "Device found",
-    });
-  } else {
-    res.json({
-      status: "failure",
-      result: null,
-      message: "No Device found",
-    });
+  if (req.query.serialNumber) {
+    const modelNo = req.query.serialNumber.charAt(4);
+    Product.findOne({
+      modelNo: modelNo
+    }).then((data) => {
+      if (data) {
+        res.json({
+          status: "success",
+          result: {
+            name: data.name,
+            image: "/images/" + data.image,
+          },
+          message: "Device found",
+        });
+      } else {
+        res.json({
+          status: "failure",
+          result: null,
+          message: "No Device found",
+        });
+      }
+    }).catch(
+      (err) =>{
+         console.error(err)
+         res.json({
+           status: "failure",
+           result: null,
+           message: "No Device found",
+         });
+      }
+    );
   }
 });
-  
+
 
 module.exports = router;
